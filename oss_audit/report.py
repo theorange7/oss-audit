@@ -4,7 +4,7 @@ report.py — renders AuditResult to Markdown, HTML, and JSON.
 
 import json
 from datetime import datetime
-from .runner import AuditResult, Finding, RubricScore
+from .runner import AuditResult, Finding, RubricScore, severity_rank
 
 # ── shared helpers ─────────────────────────────────────────────────────────────
 
@@ -21,12 +21,6 @@ CAT_LABELS = {
     "telemetry": "Telemetry / Privacy",
     "static": "Static Analysis",
 }
-
-def _sev_counts(findings):
-    counts = {s: 0 for s in ["critical","high","medium","low","info"]}
-    for f in findings:
-        counts[f.severity] = counts.get(f.severity, 0) + 1
-    return counts
 
 def _tool_findings(result: AuditResult, category: str | None = None) -> list[Finding]:
     findings = []
@@ -117,7 +111,7 @@ def to_markdown(result: AuditResult) -> str:
         cat_findings = [f for f in _all_findings(result) if f.category == r.category]
         if cat_findings:
             # Show top 10 by severity
-            cat_findings.sort(key=lambda f: ["critical","high","medium","low","info"].index(f.severity))
+            cat_findings.sort(key=lambda f: severity_rank(f.severity))
             lines += ["| Severity | Title | Location |",
                       "|---|---|---|"]
             for f in cat_findings[:10]:
@@ -180,7 +174,7 @@ def to_html(result: AuditResult) -> str:
     for r in result.rubric:
         cat_findings = sorted(
             [f for f in all_findings if f.category == r.category],
-            key=lambda f: ["critical","high","medium","low","info"].index(f.severity)
+            key=lambda f: severity_rank(f.severity)
         )
         if not cat_findings:
             continue

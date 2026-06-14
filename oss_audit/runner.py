@@ -11,8 +11,9 @@ import tempfile
 import os
 import time
 import fnmatch
-from concurrent.futures import ThreadPoolExecutor, Future, as_completed
+from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Optional, Callable
 
 
@@ -30,7 +31,6 @@ TEST_FILE_GLOBS: tuple[str, ...] = (
     "*.spec.*",     # JS/TS:  auth.spec.ts
     "conftest.py",
 )
-from pathlib import Path
 
 
 # ── data model ────────────────────────────────────────────────────────────────
@@ -114,7 +114,34 @@ def run_cmd(cmd: list[str], cwd: str = None, timeout: int = 300, extra_env: dict
         return -1, "", str(e)
 
 
-SEV_ORDER = {"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}
+# Canonical severity ordering, most → least severe. Shared with report.py so the
+# whole codebase sorts and buckets severities the same way.
+SEVERITY_LEVELS: tuple[str, ...] = ("critical", "high", "medium", "low", "info")
+
+
+def severity_rank(sev: str) -> int:
+    """Sort key for a severity: 0 = most severe. Unknown values sort last."""
+    try:
+        return SEVERITY_LEVELS.index(sev)
+    except ValueError:
+        return len(SEVERITY_LEVELS)
+
+
+def _score_to_severity(score: float) -> str:
+    """Map a 0–10 OpenSSF Scorecard score to a severity bucket.
+
+    A negative score means the check could not run (N/A) and maps to info.
+    """
+    if score < 0:
+        return "info"    # N/A — check could not run
+    if score < 4:
+        return "high"
+    if score < 7:
+        return "medium"
+    if score < 9:
+        return "low"
+    return "info"        # passing
+
 
 def normalise_sev(s: str) -> str:
     s = s.lower().strip()
@@ -398,17 +425,9 @@ def run_scorecard(repo_url: str, available: dict) -> ToolResult:
     checks = data.get("checks", [])
 
     if aggregate >= 0:
-        if aggregate < 4:
-            agg_sev = "high"
-        elif aggregate < 7:
-            agg_sev = "medium"
-        elif aggregate < 9:
-            agg_sev = "low"
-        else:
-            agg_sev = "info"
         tr.findings.append(Finding(
             tool="scorecard",
-            severity=agg_sev,
+            severity=_score_to_severity(aggregate),
             category="health",
             title=f"OpenSSF Scorecard aggregate: {aggregate:.1f}/10",
             detail=(
@@ -421,17 +440,7 @@ def run_scorecard(repo_url: str, available: dict) -> ToolResult:
     for check in checks:
         score = check.get("score", -1)
         name  = check.get("name", "?")
-
-        if score < 0:
-            sev = "info"       # N/A — check could not run
-        elif score < 4:
-            sev = "high"
-        elif score < 7:
-            sev = "medium"
-        elif score < 9:
-            sev = "low"
-        else:
-            sev = "info"       # passing
+        sev   = _score_to_severity(score)
 
         reason  = check.get("reason", "")
         details = [d for d in (check.get("details") or []) if d][:3]
@@ -613,7 +622,7 @@ def apply_rubric(tool_results: list[ToolResult], profile: str) -> tuple[list[Rub
     for cat, thresh in thresholds.items():
         findings = by_category.get(cat, [])
         counts = {s: sum(1 for f in findings if f.severity == s)
-                  for s in ["critical", "high", "medium", "low", "info"]}
+                  for s in SEVERITY_LEVELS}
 
         verdict = "PASS"
         reason = "No significant issues detected."
@@ -675,8 +684,6 @@ def audit(
     on_event(tool, status) is called as each tool transitions state:
       status is one of: "started", "done", "skipped", "error"
     """
-    from datetime import datetime, timezone
-
     def notify(tool: str, status: str):
         if on_event:
             on_event(tool, status)

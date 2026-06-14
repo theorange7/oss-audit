@@ -79,8 +79,8 @@ CMD ["--help"]
 # Build:
 #   docker build -t oss-audit .
 #
-# Run:
+# Run (note the `scan` subcommand):
 #   docker run --rm -v $(pwd)/reports:/reports \
-#     oss-audit https://github.com/org/repo \
+#     oss-audit scan https://github.com/org/repo \
 #     --output /reports/myrepo \
 #     --profile privacy
