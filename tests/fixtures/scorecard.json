@@ -1,0 +1,26 @@
+{
+  "score": 7.3,
+  "repo": {"name": "github.com/org/repo", "commit": "abcdef1234567890"},
+  "checks": [
+    {
+      "name": "Maintained",
+      "score": 10,
+      "reason": "30 commits in the last 90 days",
+      "details": [],
+      "documentation": {"url": "https://example.com/maintained"}
+    },
+    {
+      "name": "Branch-Protection",
+      "score": 2,
+      "reason": "branch protection not enabled",
+      "details": ["d1", "d2", "d3", "d4"],
+      "documentation": {"url": "https://example.com/branch-protection"}
+    },
+    {
+      "name": "CII-Best-Practices",
+      "score": -1,
+      "reason": "no badge found",
+      "details": null
+    }
+  ]
+}

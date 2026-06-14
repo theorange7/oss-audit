@@ -22,6 +22,7 @@ from .scanners import (
     check_tools, run_cmd,
     run_syft, run_grype, run_trivy, run_gitleaks, run_semgrep,
     run_osv, run_scorecard, run_license_scan, run_telemetry_scan,
+    parse_grype, parse_trivy, parse_semgrep, parse_osv, parse_scorecard, parse_gitleaks,
 )
 
 __all__ = [
@@ -31,6 +32,7 @@ __all__ = [
     "TOOLS", "TEST_DIR_NAMES", "TEST_FILE_GLOBS", "check_tools", "run_cmd",
     "run_syft", "run_grype", "run_trivy", "run_gitleaks", "run_semgrep",
     "run_osv", "run_scorecard", "run_license_scan", "run_telemetry_scan",
+    "parse_grype", "parse_trivy", "parse_semgrep", "parse_osv", "parse_scorecard", "parse_gitleaks",
     "audit",
 ]
 

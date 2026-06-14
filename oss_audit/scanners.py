@@ -102,6 +102,23 @@ def run_syft(repo_path: str, available: dict) -> tuple[ToolResult, Optional[str]
     return tr, sbom_path if (sbom_path and os.path.exists(sbom_path)) else None
 
 
+def parse_grype(data: dict) -> list[Finding]:
+    findings = []
+    for m in data.get("matches", []):
+        vuln = m.get("vulnerability", {})
+        pkg = m.get("artifact", {})
+        sev = normalise_sev(vuln.get("severity", "info"))
+        findings.append(Finding(
+            tool="grype",
+            severity=sev,
+            category="vuln",
+            title=f"{vuln.get('id','?')} in {pkg.get('name','?')} {pkg.get('version','?')}",
+            detail=vuln.get("description", "")[:300],
+            location=pkg.get("locations", [{}])[0].get("realPath", "") if pkg.get("locations") else "",
+        ))
+    return findings
+
+
 def run_grype(repo_path: str, available: dict, sbom_path: Optional[str]) -> ToolResult:
     tr = ToolResult(tool="grype", available=available.get("grype", False), ran=False)
     if not tr.available:
@@ -117,21 +134,36 @@ def run_grype(repo_path: str, available: dict, sbom_path: Optional[str]) -> Tool
 
     try:
         data = json.loads(out)
-        for m in data.get("matches", []):
-            vuln = m.get("vulnerability", {})
-            pkg = m.get("artifact", {})
-            sev = normalise_sev(vuln.get("severity", "info"))
-            tr.findings.append(Finding(
-                tool="grype",
-                severity=sev,
-                category="vuln",
-                title=f"{vuln.get('id','?')} in {pkg.get('name','?')} {pkg.get('version','?')}",
-                detail=vuln.get("description", "")[:300],
-                location=pkg.get("locations", [{}])[0].get("realPath", "") if pkg.get("locations") else "",
-            ))
     except json.JSONDecodeError:
         tr.error = "Could not parse grype JSON output"
+        return tr
+    tr.findings.extend(parse_grype(data))
     return tr
+
+
+def parse_trivy(data: dict) -> list[Finding]:
+    findings = []
+    for result in data.get("Results", []):
+        for v in result.get("Vulnerabilities", []) or []:
+            sev = normalise_sev(v.get("Severity", "info"))
+            findings.append(Finding(
+                tool="trivy",
+                severity=sev,
+                category="vuln",
+                title=f"{v.get('VulnerabilityID','?')} in {v.get('PkgName','?')} {v.get('InstalledVersion','?')}",
+                detail=v.get("Description", "")[:300],
+                location=result.get("Target", ""),
+            ))
+        for s in result.get("Secrets", []) or []:
+            findings.append(Finding(
+                tool="trivy",
+                severity="high",
+                category="secret",
+                title=f"Secret: {s.get('Title','?')}",
+                detail=s.get("Match", "")[:200],
+                location=result.get("Target", ""),
+            ))
+    return findings
 
 
 def run_trivy(repo_path: str, available: dict, skip_tests: bool = True) -> ToolResult:
@@ -154,29 +186,25 @@ def run_trivy(repo_path: str, available: dict, skip_tests: bool = True) -> ToolR
 
     try:
         data = json.loads(out)
-        for result in data.get("Results", []):
-            for v in result.get("Vulnerabilities", []) or []:
-                sev = normalise_sev(v.get("Severity", "info"))
-                tr.findings.append(Finding(
-                    tool="trivy",
-                    severity=sev,
-                    category="vuln",
-                    title=f"{v.get('VulnerabilityID','?')} in {v.get('PkgName','?')} {v.get('InstalledVersion','?')}",
-                    detail=v.get("Description", "")[:300],
-                    location=result.get("Target", ""),
-                ))
-            for s in result.get("Secrets", []) or []:
-                tr.findings.append(Finding(
-                    tool="trivy",
-                    severity="high",
-                    category="secret",
-                    title=f"Secret: {s.get('Title','?')}",
-                    detail=s.get("Match", "")[:200],
-                    location=result.get("Target", ""),
-                ))
     except json.JSONDecodeError:
         tr.error = "Could not parse trivy JSON output"
+        return tr
+    tr.findings.extend(parse_trivy(data))
     return tr
+
+
+def parse_gitleaks(leaks: list) -> list[Finding]:
+    findings = []
+    for leak in leaks or []:
+        findings.append(Finding(
+            tool="gitleaks",
+            severity="high",
+            category="secret",
+            title=f"Secret detected: {leak.get('Description', leak.get('RuleID','?'))}",
+            detail=f"Commit: {leak.get('Commit','?')[:8]} | Author: {leak.get('Author','?')}",
+            location=f"{leak.get('File','?')}:{leak.get('StartLine','?')}",
+        ))
+    return findings
 
 
 def run_gitleaks(repo_path: str, available: dict) -> ToolResult:
@@ -197,18 +225,25 @@ def run_gitleaks(repo_path: str, available: dict) -> ToolResult:
         if os.path.exists(report_path):
             with open(report_path) as f:
                 leaks = json.load(f) or []
-            for leak in leaks:
-                tr.findings.append(Finding(
-                    tool="gitleaks",
-                    severity="high",
-                    category="secret",
-                    title=f"Secret detected: {leak.get('Description', leak.get('RuleID','?'))}",
-                    detail=f"Commit: {leak.get('Commit','?')[:8]} | Author: {leak.get('Author','?')}",
-                    location=f"{leak.get('File','?')}:{leak.get('StartLine','?')}",
-                ))
+            tr.findings.extend(parse_gitleaks(leaks))
     except Exception as e:
         tr.error = str(e)[:300]
     return tr
+
+
+def parse_semgrep(data: dict) -> list[Finding]:
+    findings = []
+    for r in data.get("results", []):
+        sev = normalise_sev(r.get("extra", {}).get("severity", "info"))
+        findings.append(Finding(
+            tool="semgrep",
+            severity=sev,
+            category="static",
+            title=r.get("check_id", "?").split(".")[-1],
+            detail=r.get("extra", {}).get("message", "")[:300],
+            location=f"{r.get('path','?')}:{r.get('start',{}).get('line','?')}",
+        ))
+    return findings
 
 
 def run_semgrep(repo_path: str, available: dict, skip_tests: bool = True) -> ToolResult:
@@ -230,20 +265,38 @@ def run_semgrep(repo_path: str, available: dict, skip_tests: bool = True) -> Too
 
     try:
         data = json.loads(out)
-        for r in data.get("results", []):
-            meta = r.get("extra", {}).get("metadata", {})
-            sev = normalise_sev(r.get("extra", {}).get("severity", "info"))
-            tr.findings.append(Finding(
-                tool="semgrep",
-                severity=sev,
-                category="static",
-                title=r.get("check_id", "?").split(".")[-1],
-                detail=r.get("extra", {}).get("message", "")[:300],
-                location=f"{r.get('path','?')}:{r.get('start',{}).get('line','?')}",
-            ))
     except json.JSONDecodeError:
         tr.error = "Could not parse semgrep JSON output"
+        return tr
+    tr.findings.extend(parse_semgrep(data))
     return tr
+
+
+def parse_osv(data: dict) -> list[Finding]:
+    findings = []
+    for result in data.get("results", []):
+        for pkg in result.get("packages", []):
+            for vuln in pkg.get("vulnerabilities", []):
+                sev = "medium"
+                for sev_entry in vuln.get("severity", []):
+                    # rough CVSS mapping
+                    score_str = sev_entry.get("score", "")
+                    try:
+                        score = float(score_str)
+                        if score >= 9.0: sev = "critical"
+                        elif score >= 7.0: sev = "high"
+                        elif score >= 4.0: sev = "medium"
+                        else: sev = "low"
+                    except ValueError:
+                        pass
+                findings.append(Finding(
+                    tool="osv-scanner",
+                    severity=sev,
+                    category="vuln",
+                    title=f"{vuln.get('id','?')} in {pkg.get('package',{}).get('name','?')}",
+                    detail=vuln.get("summary", "")[:300],
+                ))
+    return findings
 
 
 def run_osv(repo_path: str, available: dict) -> ToolResult:
@@ -261,31 +314,60 @@ def run_osv(repo_path: str, available: dict) -> ToolResult:
 
     try:
         data = json.loads(out)
-        for result in data.get("results", []):
-            for pkg in result.get("packages", []):
-                for vuln in pkg.get("vulnerabilities", []):
-                    sev = "medium"
-                    for sev_entry in vuln.get("severity", []):
-                        # rough CVSS mapping
-                        score_str = sev_entry.get("score", "")
-                        try:
-                            score = float(score_str)
-                            if score >= 9.0: sev = "critical"
-                            elif score >= 7.0: sev = "high"
-                            elif score >= 4.0: sev = "medium"
-                            else: sev = "low"
-                        except ValueError:
-                            pass
-                    tr.findings.append(Finding(
-                        tool="osv-scanner",
-                        severity=sev,
-                        category="vuln",
-                        title=f"{vuln.get('id','?')} in {pkg.get('package',{}).get('name','?')}",
-                        detail=vuln.get("summary", "")[:300],
-                    ))
     except json.JSONDecodeError:
         tr.error = "Could not parse osv-scanner JSON output"
+        return tr
+    tr.findings.extend(parse_osv(data))
     return tr
+
+
+def parse_scorecard(data: dict) -> list[Finding]:
+    findings = []
+
+    # ── aggregate score ────────────────────────────────────────────────────────
+    aggregate = data.get("score", -1)
+    commit = data.get("repo", {}).get("commit", "")[:8]
+    checks = data.get("checks", [])
+
+    if aggregate >= 0:
+        findings.append(Finding(
+            tool="scorecard",
+            severity=score_to_severity(aggregate),
+            category="health",
+            title=f"OpenSSF Scorecard aggregate: {aggregate:.1f}/10",
+            detail=(
+                f"{len(checks)} checks evaluated"
+                + (f" at commit {commit}" if commit else "")
+            ),
+        ))
+
+    # ── per-check findings ────────────────────────────────────────────────────
+    for check in checks:
+        score = check.get("score", -1)
+        name  = check.get("name", "?")
+        sev   = score_to_severity(score)
+
+        reason  = check.get("reason", "")
+        details = [d for d in (check.get("details") or []) if d][:3]
+        doc_url = check.get("documentation", {}).get("url", "")
+
+        detail_parts = [reason] if reason else []
+        if details:
+            detail_parts.append("; ".join(details))
+        if doc_url:
+            detail_parts.append(doc_url)
+        detail = " — ".join(detail_parts)
+
+        score_str = f"{score}/10" if score >= 0 else "N/A"
+        findings.append(Finding(
+            tool="scorecard",
+            severity=sev,
+            category="health",
+            title=f"{name}: {score_str}",
+            detail=detail[:400],
+        ))
+
+    return findings
 
 
 def run_scorecard(repo_url: str, available: dict) -> ToolResult:
@@ -327,50 +409,7 @@ def run_scorecard(repo_url: str, available: dict) -> ToolResult:
     except json.JSONDecodeError:
         tr.error = (err or out)[:500] or "Could not parse scorecard JSON output"
         return tr
-
-    # ── aggregate score ────────────────────────────────────────────────────────
-    aggregate = data.get("score", -1)
-    commit = data.get("repo", {}).get("commit", "")[:8]
-    checks = data.get("checks", [])
-
-    if aggregate >= 0:
-        tr.findings.append(Finding(
-            tool="scorecard",
-            severity=score_to_severity(aggregate),
-            category="health",
-            title=f"OpenSSF Scorecard aggregate: {aggregate:.1f}/10",
-            detail=(
-                f"{len(checks)} checks evaluated"
-                + (f" at commit {commit}" if commit else "")
-            ),
-        ))
-
-    # ── per-check findings ────────────────────────────────────────────────────
-    for check in checks:
-        score = check.get("score", -1)
-        name  = check.get("name", "?")
-        sev   = score_to_severity(score)
-
-        reason  = check.get("reason", "")
-        details = [d for d in (check.get("details") or []) if d][:3]
-        doc_url = check.get("documentation", {}).get("url", "")
-
-        detail_parts = [reason] if reason else []
-        if details:
-            detail_parts.append("; ".join(details))
-        if doc_url:
-            detail_parts.append(doc_url)
-        detail = " — ".join(detail_parts)
-
-        score_str = f"{score}/10" if score >= 0 else "N/A"
-        tr.findings.append(Finding(
-            tool="scorecard",
-            severity=sev,
-            category="health",
-            title=f"{name}: {score_str}",
-            detail=detail[:400],
-        ))
-
+    tr.findings.extend(parse_scorecard(data))
     return tr
 
 

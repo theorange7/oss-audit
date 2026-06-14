@@ -1,0 +1,27 @@
+{
+  "matches": [
+    {
+      "vulnerability": {
+        "id": "CVE-2021-1234",
+        "severity": "Critical",
+        "description": "A serious flaw in libfoo allows remote code execution."
+      },
+      "artifact": {
+        "name": "libfoo",
+        "version": "1.2.3",
+        "locations": [{"realPath": "/app/requirements.txt"}]
+      }
+    },
+    {
+      "vulnerability": {
+        "id": "CVE-2020-9999",
+        "severity": "Moderate",
+        "description": ""
+      },
+      "artifact": {
+        "name": "libbar",
+        "version": "0.1.0"
+      }
+    }
+  ]
+}
