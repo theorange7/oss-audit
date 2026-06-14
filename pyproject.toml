@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 oss-audit = "oss_audit.cli:cli"
+ossa = "oss_audit.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
