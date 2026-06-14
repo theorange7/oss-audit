@@ -241,9 +241,27 @@ ossa scan <url>
 
 ## Extending
 
-**Add a new scanner:** implement a `run_<tool>(repo_path, available) -> ToolResult` function in `oss_audit/runner.py`, submit it in `audit()`, and append its `ToolResult` to `result.tool_results`. Ensure its findings use the standard `category` values (`vuln`, `secret`, `license`, `health`, `telemetry`, `static`) and a severity from `SEVERITY_LEVELS`.
+**Add a new scanner:** implement a `run_<tool>(repo_path, available) -> ToolResult` function in `oss_audit/scanners.py` (split the output parsing into a pure `parse_<tool>(data) -> list[Finding]` so it can be unit-tested), submit it in `audit()` in `runner.py`, and append its `ToolResult` to `result.tool_results`. Ensure its findings use the standard `category` values (`vuln`, `secret`, `license`, `health`, `telemetry`, `static`) and a severity from `SEVERITY_LEVELS` (`oss_audit/severity.py`).
 
-**Customise the rubric:** edit the `RUBRIC_THRESHOLDS` dict in `runner.py`, or add a new profile key.
+**Customise the rubric:** edit the `RUBRIC_THRESHOLDS` dict in `oss_audit/rubric.py`, or add a new profile key.
+
+---
+
+## Development & testing
+
+```bash
+uv sync                       # installs the package + dev dependencies (pytest)
+
+uv run pytest                 # fast unit tests (scanners not required)
+uv run pytest -m e2e          # end-to-end: clones a real repo and runs installed tools
+uv run pytest -m "not e2e"    # explicitly exclude the e2e test
+```
+
+The unit tests cover the pure logic — rubric, severity mapping, the scanner
+output parsers (`parse_*`, fed fixture JSON), the renderers, and the CLI
+helpers — and need no scanner binaries. The `e2e` test audits a small public
+repository with whatever tools are installed and skips automatically when git
+or network access is unavailable.
 
 ---
 
