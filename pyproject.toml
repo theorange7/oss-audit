@@ -20,3 +20,6 @@ oss-audit = "oss_audit.cli:cli"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["oss_audit*"]
+
+[tool.uv]
+package = true
