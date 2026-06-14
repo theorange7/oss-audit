@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.venv/
+
+# Tool outputs
+oss-audit-report.*
+oss-audit-sample-report.*
+_sbom.json
+_gitleaks.json
+
+# OS / editor
+.DS_Store
+.claude/
