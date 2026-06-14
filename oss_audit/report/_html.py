@@ -1,158 +1,21 @@
-"""
-report.py — renders AuditResult to Markdown, HTML, and JSON.
-"""
+"""HTML renderer — visual dark-theme report for sharing with stakeholders."""
 
-import json
 from datetime import datetime
-from .runner import AuditResult, Finding, RubricScore, severity_rank
 
-# ── shared helpers ─────────────────────────────────────────────────────────────
+from ..models import AuditResult
+from ..severity import severity_rank
+from ._common import VERDICT_EMOJI, VERDICT_COLOR, SEV_COLOR, SEV_BG, CAT_LABELS, all_findings
 
-VERDICT_EMOJI = {"PASS": "✅", "WARN": "⚠️", "FAIL": "❌", "ERROR": "🔴", "UNKNOWN": "❓"}
-VERDICT_COLOR = {"PASS": "#22c55e", "WARN": "#f59e0b", "FAIL": "#ef4444", "ERROR": "#dc2626", "UNKNOWN": "#94a3b8"}
-SEV_COLOR = {"critical": "#7f1d1d", "high": "#ef4444", "medium": "#f59e0b", "low": "#6366f1", "info": "#64748b"}
-SEV_BG    = {"critical": "#fef2f2", "high": "#fff7ed", "medium": "#fffbeb", "low": "#eef2ff", "info": "#f8fafc"}
-
-CAT_LABELS = {
-    "vuln": "Vulnerabilities",
-    "secret": "Secrets / Credentials",
-    "license": "License",
-    "health": "Project Health",
-    "telemetry": "Telemetry / Privacy",
-    "static": "Static Analysis",
-}
-
-def _tool_findings(result: AuditResult, category: str | None = None) -> list[Finding]:
-    findings = []
-    for tr in result.tool_results:
-        for f in tr.findings:
-            if category is None or f.category == category:
-                findings.append(f)
-    return findings
-
-def _all_findings(result: AuditResult) -> list[Finding]:
-    return _tool_findings(result)
-
-
-# ── JSON ───────────────────────────────────────────────────────────────────────
-
-def to_json(result: AuditResult) -> str:
-    def finding_dict(f: Finding):
-        return {"tool": f.tool, "severity": f.severity, "category": f.category,
-                "title": f.title, "detail": f.detail, "location": f.location}
-
-    def rubric_dict(r: RubricScore):
-        return {"category": r.category, "verdict": r.verdict, "reason": r.reason,
-                "counts": {"critical": r.critical_count, "high": r.high_count,
-                           "medium": r.medium_count, "low": r.low_count}}
-
-    data = {
-        "meta": {
-            "repo_url": result.repo_url,
-            "repo_name": result.repo_name,
-            "profile": result.profile,
-            "timestamp": result.timestamp,
-            "overall_verdict": result.overall_verdict,
-            "overall_reason": result.overall_reason,
-        },
-        "skipped_tools": result.skipped_tools,
-        "rubric": [rubric_dict(r) for r in result.rubric],
-        "findings": [finding_dict(f) for f in _all_findings(result)],
-        "tool_summary": [
-            {"tool": tr.tool, "available": tr.available, "ran": tr.ran,
-             "duration_s": round(tr.duration_s, 2), "finding_count": len(tr.findings),
-             "error": tr.error}
-            for tr in result.tool_results
-        ],
-    }
-    return json.dumps(data, indent=2)
-
-
-# ── MARKDOWN ───────────────────────────────────────────────────────────────────
-
-def to_markdown(result: AuditResult) -> str:
-    v = result.overall_verdict
-    emoji = VERDICT_EMOJI.get(v, "❓")
-    lines = []
-
-    lines += [
-        f"# OSS Audit Report — `{result.repo_name}`",
-        "",
-        f"> **Repo:** {result.repo_url}  ",
-        f"> **Profile:** `{result.profile}`  ",
-        f"> **Scanned:** {result.timestamp}  ",
-        f"> **Overall:** {emoji} **{v}** — {result.overall_reason}",
-        "",
-        "---",
-        "",
-        "## Executive Summary",
-        "",
-        "| Category | Verdict | Critical | High | Medium | Low |",
-        "|---|---|---|---|---|---|",
-    ]
-
-    for r in result.rubric:
-        e = VERDICT_EMOJI.get(r.verdict, "?")
-        lines.append(
-            f"| {CAT_LABELS.get(r.category, r.category)} "
-            f"| {e} {r.verdict} "
-            f"| {r.critical_count} | {r.high_count} | {r.medium_count} | {r.low_count} |"
-        )
-
-    lines += ["", "---", "", "## Rubric Details", ""]
-    for r in result.rubric:
-        e = VERDICT_EMOJI.get(r.verdict, "?")
-        lines += [
-            f"### {e} {CAT_LABELS.get(r.category, r.category)}",
-            f"**Verdict:** {r.verdict}  ",
-            f"**Reason:** {r.reason}",
-            "",
-        ]
-        cat_findings = [f for f in _all_findings(result) if f.category == r.category]
-        if cat_findings:
-            # Show top 10 by severity
-            cat_findings.sort(key=lambda f: severity_rank(f.severity))
-            lines += ["| Severity | Title | Location |",
-                      "|---|---|---|"]
-            for f in cat_findings[:10]:
-                loc = f.location or "—"
-                lines.append(f"| `{f.severity}` | {f.title} | `{loc}` |")
-            if len(cat_findings) > 10:
-                lines.append(f"_…and {len(cat_findings)-10} more. See JSON output for full list._")
-            lines.append("")
-
-    # Tool coverage
-    lines += ["---", "", "## Tool Coverage", "",
-              "| Tool | Available | Ran | Findings | Duration |",
-              "|---|---|---|---|---|"]
-    for tr in result.tool_results:
-        avail = "✅" if tr.available else "⬜ skipped"
-        ran   = "✅" if tr.ran else "—"
-        dur   = f"{tr.duration_s:.1f}s" if tr.ran else "—"
-        lines.append(f"| {tr.tool} | {avail} | {ran} | {len(tr.findings)} | {dur} |")
-
-    if result.skipped_tools:
-        lines += ["",
-                  f"> **Skipped tools** (not installed): {', '.join(f'`{t}`' for t in result.skipped_tools)}",
-                  "> Install them to improve coverage."]
-
-    lines += ["", "---", "",
-              "_Generated by [oss-audit](https://github.com/your-org/oss-audit)_"]
-
-    return "\n".join(lines)
-
-
-# ── HTML ───────────────────────────────────────────────────────────────────────
 
 def to_html(result: AuditResult) -> str:
     v = result.overall_verdict
     vc = VERDICT_COLOR.get(v, "#94a3b8")
-    all_findings = _all_findings(result)
-    total_critical = sum(1 for f in all_findings if f.severity == "critical")
-    total_high     = sum(1 for f in all_findings if f.severity == "high")
-    total_medium   = sum(1 for f in all_findings if f.severity == "medium")
-    total_low      = sum(1 for f in all_findings if f.severity == "low")
-    total_findings = len(all_findings)
+    findings = all_findings(result)
+    total_critical = sum(1 for f in findings if f.severity == "critical")
+    total_high     = sum(1 for f in findings if f.severity == "high")
+    total_medium   = sum(1 for f in findings if f.severity == "medium")
+    total_low      = sum(1 for f in findings if f.severity == "low")
+    total_findings = len(findings)
 
     # Build rubric rows
     rubric_rows = ""
@@ -173,7 +36,7 @@ def to_html(result: AuditResult) -> str:
     finding_sections = ""
     for r in result.rubric:
         cat_findings = sorted(
-            [f for f in all_findings if f.category == r.category],
+            [f for f in findings if f.category == r.category],
             key=lambda f: severity_rank(f.severity)
         )
         if not cat_findings:
