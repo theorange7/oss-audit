@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
 oss-audit — CLI entry point
-Usage: oss-audit <github-url> [options]
 """
 
 import sys
 import time
 import threading
+import json
+import webbrowser
 from pathlib import Path
+from datetime import datetime
 
 import click
 from rich.console import Console
@@ -21,7 +23,9 @@ from .report import to_json, to_markdown, to_html
 
 console = Console()
 
-# ── tool display metadata ──────────────────────────────────────────────────────
+# ── constants ──────────────────────────────────────────────────────────────────
+
+DEFAULT_REPORTS_DIR = Path.home() / ".oss-audit" / "reports"
 
 TOOL_LABEL = {
     "git":         "git clone",
@@ -39,7 +43,7 @@ TOOL_LABEL = {
 TOOL_ORDER = list(TOOL_LABEL.keys())
 
 STATUS_STYLE = {
-    "waiting":  ("dim", "·  waiting"),
+    "waiting":  ("dim",    "·  waiting"),
     "started":  ("yellow", "⟳  running"),
     "done":     ("green",  "✓  done"),
     "skipped":  ("dim",    "⬜ skipped"),
@@ -64,7 +68,7 @@ CAT_LABELS = {
 }
 
 
-# ── live progress ──────────────────────────────────────────────────────────────
+# ── live progress tracker ──────────────────────────────────────────────────────
 
 class ProgressTracker:
     def __init__(self):
@@ -89,14 +93,6 @@ class ProgressTracker:
         with self._lock:
             self._findings[tool] = count
 
-    def elapsed(self, tool: str) -> float:
-        now = time.monotonic()
-        with self._lock:
-            if self._status[tool] == "started":
-                t0 = self._started_at.get(tool)
-                return (now - t0) if t0 else 0.0
-            return self._elapsed.get(tool, 0.0)
-
     def wall_elapsed(self) -> float:
         return time.monotonic() - self._wall_start
 
@@ -112,97 +108,90 @@ class ProgressTracker:
             for tool in TOOL_ORDER:
                 st = self._status.get(tool, "waiting")
                 sty, label = STATUS_STYLE.get(st, ("dim", st))
-                elapsed = self._elapsed.get(tool) if st != "started" else None
 
                 if st == "started":
                     t0 = self._started_at.get(tool)
-                    elapsed_live = (time.monotonic() - t0) if t0 else 0.0
-                    time_str = f"{elapsed_live:.1f}s"
+                    time_str = f"{(time.monotonic() - t0):.1f}s" if t0 else "—"
                 else:
+                    elapsed = self._elapsed.get(tool)
                     time_str = f"{elapsed:.1f}s" if elapsed else "—"
 
                 findings = self._findings.get(tool)
-                findings_str = str(findings) if findings is not None else "—"
-
                 t.add_row(
                     TOOL_LABEL.get(tool, tool),
                     Text(label, style=sty),
                     time_str,
-                    findings_str,
+                    str(findings) if findings is not None else "—",
                 )
         return t
 
 
-# ── CLI ────────────────────────────────────────────────────────────────────────
+# ── CLI group ──────────────────────────────────────────────────────────────────
 
-@click.command(context_settings=dict(help_option_names=["-h", "--help"]))
-@click.argument("repo_url", required=False, default=None)
+CONTEXT = dict(help_option_names=["-h", "--help"])
+
+@click.group(context_settings=CONTEXT)
+@click.version_option("0.1.0", prog_name="oss-audit")
+def cli():
+    """Audit open-source repositories for security, privacy, and licensing issues."""
+
+
+# ── scan subcommand ────────────────────────────────────────────────────────────
+
+@cli.command("scan", context_settings=CONTEXT)
+@click.argument("repo_url")
 @click.option(
     "--profile", "-p",
     type=click.Choice(["privacy", "standard"], case_sensitive=False),
-    default="privacy",
-    show_default=True,
-    help="Rubric profile. 'privacy' applies tighter thresholds for sensitive environments.",
+    default="privacy", show_default=True,
+    help="Rubric profile. 'privacy' applies tighter thresholds.",
 )
 @click.option(
     "--output", "-o",
     default=None,
     help=(
-        "Output base path (without extension). "
+        "Output base path (no extension). "
         "Defaults to ~/.oss-audit/reports/{repo}/{timestamp}. "
-        "When set explicitly, no timestamp or --latest symlink is created."
+        "When set explicitly, no timestamp or latest symlink is created."
     ),
 )
 @click.option(
     "--format", "-f", "fmt",
     type=click.Choice(["all", "md", "html", "json"], case_sensitive=False),
-    default="all",
-    show_default=True,
-    help="Output format(s). 'all' writes MD + HTML + JSON.",
+    default="html", show_default=True,
+    help="Output format(s). 'all' writes HTML + MD + JSON.",
 )
 @click.option(
     "--check-tools", "do_check_tools",
-    is_flag=True,
-    default=False,
+    is_flag=True, default=False,
     help="Print tool availability and exit.",
 )
 @click.option(
     "--include-tests",
-    is_flag=True,
-    default=False,
-    help="Include test files in semgrep, trivy, and telemetry scans. Excluded by default to reduce false positives.",
+    is_flag=True, default=False,
+    help="Include test files in semgrep, trivy, and telemetry scans.",
 )
-@click.version_option("0.1.0", prog_name="oss-audit")
-def cli(repo_url, profile, output, fmt, do_check_tools, include_tests):
+def scan(repo_url, profile, output, fmt, do_check_tools, include_tests):
     """
-    Audit an open-source GitHub repository for security, privacy,
-    and licensing issues before use in a sensitive environment.
+    Audit a GitHub repository.
 
     \b
     Examples:
-      oss-audit https://github.com/org/repo
-      oss-audit https://github.com/org/repo --profile standard
-      oss-audit https://github.com/org/repo --output ./reports/myrepo --format html
-      open ~/.oss-audit/reports/myrepo/latest.html
+      oss-audit scan https://github.com/org/repo
+      oss-audit scan https://github.com/org/repo --profile standard
+      oss-audit scan https://github.com/org/repo --format all
     """
-
     if do_check_tools:
         _print_tool_check()
         return
 
-    if not repo_url:
-        raise click.UsageError("REPO_URL is required unless --check-tools is passed.")
-
-    # First-run notice: warn before creating ~/.oss-audit/ for the first time.
+    # First-run notice before creating ~/.oss-audit/.
     if output is None and _default_reports_dir_is_new():
         console.print()
         console.print(
-            f"[bold yellow]Notice:[/] Reports will be saved to "
-            f"[cyan]{DEFAULT_REPORTS_DIR}[/] by default."
+            f"[bold yellow]Notice:[/] Reports will be saved to [cyan]{DEFAULT_REPORTS_DIR}[/] by default."
         )
-        console.print(
-            "  Use [bold]--output <path>[/] to write reports anywhere you like instead."
-        )
+        console.print("  Use [bold]--output <path>[/] to write reports elsewhere.")
         console.print()
         if not click.confirm("  Continue?", default=True):
             console.print("\n  Aborted. Re-run with [bold]--output ./my-report[/] to set a custom path.\n")
@@ -211,35 +200,33 @@ def cli(repo_url, profile, output, fmt, do_check_tools, include_tests):
     console.print()
     console.print(f"[bold]oss-audit[/]  profile: [cyan]{profile}[/]  {repo_url}")
     if not include_tests:
-        console.print("  [dim]Test files excluded from semgrep, trivy, and telemetry scans (--include-tests to override).[/]")
+        console.print("  [dim]Test files excluded (--include-tests to override).[/]")
     console.print()
 
     tracker = ProgressTracker()
 
-    def on_event(tool: str, status: str):
-        tracker.update(tool, status)
-
     with Live(tracker.render(), console=console, refresh_per_second=8,
               vertical_overflow="visible") as live:
+
+        done_event = threading.Event()
 
         def refresh_loop():
             while not done_event.is_set():
                 live.update(tracker.render())
                 time.sleep(0.125)
 
-        done_event = threading.Event()
         refresh_thread = threading.Thread(target=refresh_loop, daemon=True)
         refresh_thread.start()
 
-        result = audit(repo_url=repo_url, profile=profile, on_event=on_event,
-                       skip_tests=not include_tests)
+        result = audit(
+            repo_url=repo_url, profile=profile,
+            on_event=tracker.update,
+            skip_tests=not include_tests,
+        )
 
-        # Populate finding counts from finished result.
-        # "telemetry-grep" is the internal ToolResult name; map it to the tracker key.
         _tool_key = {"telemetry-grep": "telemetry"}
         for tr in result.tool_results:
-            key = _tool_key.get(tr.tool, tr.tool)
-            tracker.set_findings(key, len(tr.findings))
+            tracker.set_findings(_tool_key.get(tr.tool, tr.tool), len(tr.findings))
 
         done_event.set()
         refresh_thread.join()
@@ -249,17 +236,15 @@ def cli(repo_url, profile, output, fmt, do_check_tools, include_tests):
     _print_summary(result, tracker.wall_elapsed())
     console.print()
 
-    # Resolve output path and whether to create --latest symlinks.
     out_base, use_latest = _resolve_output(output, result.repo_name, result.timestamp)
     out_base.parent.mkdir(parents=True, exist_ok=True)
     written = []
 
-    formats = {
-        "json": (fmt in ("all", "json"), to_json),
-        "md":   (fmt in ("all", "md"),   to_markdown),
+    for ext, (enabled, renderer) in {
         "html": (fmt in ("all", "html"), to_html),
-    }
-    for ext, (enabled, renderer) in formats.items():
+        "md":   (fmt in ("all", "md"),   to_markdown),
+        "json": (fmt in ("all", "json"), to_json),
+    }.items():
         if not enabled:
             continue
         p = out_base.with_suffix(f".{ext}")
@@ -272,38 +257,106 @@ def cli(repo_url, profile, output, fmt, do_check_tools, include_tests):
     for p in written:
         console.print(f"  [cyan]{p}[/]")
     if use_latest:
-        repo_dir = out_base.parent
-        console.print(f"\n  [dim]Latest:[/] [cyan]{repo_dir}/latest.html[/]")
+        console.print(f"\n  [dim]Latest:[/] [cyan]{out_base.parent}/latest.html[/]")
     console.print()
 
     sys.exit(0 if result.overall_verdict in ("PASS", "WARN") else 1)
 
 
-# ── output helpers ────────────────────────────────────────────────────────────
+# ── reports subcommand ─────────────────────────────────────────────────────────
 
-DEFAULT_REPORTS_DIR = Path.home() / ".oss-audit" / "reports"
+@cli.command("reports", context_settings=CONTEXT)
+def reports():
+    """
+    Browse, open, or delete generated HTML reports.
 
+    \b
+    Examples:
+      oss-audit reports
+    """
+    if not DEFAULT_REPORTS_DIR.exists():
+        console.print(f"\n[dim]No reports found. Run [bold]oss-audit scan <url>[/] first.[/]\n")
+        return
 
-def _resolve_output(
-    explicit: Optional[str], repo_name: str, iso_timestamp: str
-) -> tuple[Path, bool]:
-    """Return (out_base, use_latest). use_latest is True only for the default location."""
-    if explicit:
-        return Path(explicit), False
+    # Collect all timestamped HTML files (exclude latest.* symlinks).
+    entries: list[tuple[str, Path]] = []
+    for repo_dir in sorted(DEFAULT_REPORTS_DIR.iterdir()):
+        if not repo_dir.is_dir():
+            continue
+        for html in sorted(repo_dir.glob("*.html"), reverse=True):
+            if html.is_symlink():
+                continue
+            entries.append((repo_dir.name, html))
+
+    if not entries:
+        console.print(f"\n[dim]No reports found in {DEFAULT_REPORTS_DIR}[/]\n")
+        return
+
+    # Display report list.
+    console.print()
+    t = Table(box=box.SIMPLE, show_header=True, header_style="dim", expand=False,
+              padding=(0, 1))
+    t.add_column("#",         justify="right", style="dim", min_width=3)
+    t.add_column("Repo",      style="bold",    min_width=20)
+    t.add_column("Timestamp",                  min_width=18)
+    t.add_column("Verdict",                    min_width=8)
+
+    for i, (repo, html) in enumerate(entries, 1):
+        verdict, vstyle = _read_verdict(html)
+        t.add_row(str(i), repo, _format_ts(html.stem), Text(verdict, style=vstyle))
+
+    console.print(t)
+
+    # Select a report.
+    try:
+        idx = click.prompt(
+            "Select report",
+            type=click.IntRange(1, len(entries)),
+            prompt_suffix=" [1-{}]: ".format(len(entries)),
+        )
+    except click.Abort:
+        console.print()
+        return
+
+    repo, html = entries[idx - 1]
+    console.print(
+        f"\n  [bold]{repo}[/]  [dim]{_format_ts(html.stem)}[/]\n"
+        f"  [o] Open in browser\n"
+        f"  [d] Delete\n"
+        f"  [q] Cancel\n"
+    )
 
     try:
-        from datetime import datetime
+        action = click.prompt("Action", type=click.Choice(["o", "d", "q"]),
+                              default="o", show_choices=False)
+    except click.Abort:
+        console.print()
+        return
+
+    if action == "o":
+        webbrowser.open(html.as_uri())
+        console.print(f"\n  [green]Opened[/] [cyan]{html}[/]\n")
+
+    elif action == "d":
+        _delete_report(html)
+
+    # q: fall through silently
+
+
+# ── output helpers ─────────────────────────────────────────────────────────────
+
+def _resolve_output(explicit: str | None, repo_name: str, iso_timestamp: str) -> tuple[Path, bool]:
+    if explicit:
+        return Path(explicit), False
+    try:
         dt = datetime.fromisoformat(iso_timestamp.replace("Z", "+00:00"))
         ts = dt.strftime("%Y%m%d-%H%M%S")
     except Exception:
         ts = iso_timestamp[:19].replace(":", "").replace("T", "-")
-
-    repo_dir = DEFAULT_REPORTS_DIR / repo_name
-    return repo_dir / ts, True
+    return DEFAULT_REPORTS_DIR / repo_name / ts, True
 
 
 def _update_symlink(target: Path, ext: str):
-    """Point latest.<ext> in the same directory to target (by relative name)."""
     link = target.parent / f"latest.{ext}"
     if link.is_symlink() or link.exists():
         link.unlink()
@@ -314,23 +367,75 @@ def _default_reports_dir_is_new() -> bool:
     return not DEFAULT_REPORTS_DIR.exists()
 
 
-# ── summary ────────────────────────────────────────────────────────────────────
+def _format_ts(stem: str) -> str:
+    """Convert '20260614-143201' → '2026-06-14  14:32:01'."""
+    try:
+        dt = datetime.strptime(stem, "%Y%m%d-%H%M%S")
+        return dt.strftime("%Y-%m-%d  %H:%M:%S")
+    except ValueError:
+        return stem
+
+
+def _read_verdict(html: Path) -> tuple[str, str]:
+    """Read overall verdict from JSON sidecar; fall back to '?' if absent."""
+    sidecar = html.with_suffix(".json")
+    try:
+        data = json.loads(sidecar.read_text(encoding="utf-8"))
+        v = data.get("meta", {}).get("overall_verdict", "?")
+        return v, VERDICT_STYLE.get(v, "dim")
+    except Exception:
+        return "?", "dim"
+
+
+def _delete_report(html: Path):
+    repo_dir = html.parent
+    stem = html.stem
+    deleted = []
+
+    for ext in ("html", "md", "json"):
+        f = html.with_suffix(f".{ext}")
+        if f.exists():
+            f.unlink()
+            deleted.append(f.name)
+
+        # Remove latest symlink if it pointed at this file.
+        link = repo_dir / f"latest.{ext}"
+        if link.is_symlink() and link.resolve().stem == stem:
+            link.unlink()
+            # Point latest at the next most recent file if one exists.
+            remaining = sorted(
+                [p for p in repo_dir.glob(f"*.{ext}") if not p.is_symlink()],
+                reverse=True,
+            )
+            if remaining:
+                _update_symlink(remaining[0], ext)
+
+    console.print(f"\n  [red]Deleted:[/] {', '.join(deleted)}\n")
+
+    # Remove the repo directory if now empty (ignoring latest.* symlinks).
+    real_files = [p for p in repo_dir.iterdir() if not p.is_symlink()]
+    if not real_files:
+        for link in repo_dir.iterdir():
+            link.unlink()
+        repo_dir.rmdir()
+        console.print(f"  [dim]Removed empty directory {repo_dir}[/]\n")
+
+
+# ── scan summary ───────────────────────────────────────────────────────────────
 
 def _print_summary(result, wall_s: float = 0.0):
     v = result.overall_verdict
     vstyle = VERDICT_STYLE.get(v, "dim")
 
     console.rule(style="dim")
-    console.print(
-        f"  Overall: [{vstyle}]{v}[/]  [dim]{result.overall_reason}[/]"
-    )
+    console.print(f"  Overall: [{vstyle}]{v}[/]  [dim]{result.overall_reason}[/]")
     console.rule(style="dim")
     console.print()
 
     t = Table(box=box.SIMPLE, show_header=True, header_style="dim", expand=False,
               padding=(0, 1))
-    t.add_column("Category",  style="bold", min_width=26)
-    t.add_column("Verdict",   min_width=8)
+    t.add_column("Category", style="bold", min_width=26)
+    t.add_column("Verdict",  min_width=8)
     t.add_column("Crit",  justify="right")
     t.add_column("High",  justify="right")
     t.add_column("Med",   justify="right")
@@ -350,9 +455,7 @@ def _print_summary(result, wall_s: float = 0.0):
     console.print(t)
 
     if result.skipped_tools:
-        console.print(
-            f"  [dim]Skipped (not installed): {', '.join(result.skipped_tools)}[/]"
-        )
+        console.print(f"  [dim]Skipped (not installed): {', '.join(result.skipped_tools)}[/]")
         console.print()
 
     if wall_s:
