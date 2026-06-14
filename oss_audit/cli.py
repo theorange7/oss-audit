@@ -136,6 +136,14 @@ def cli():
     """Audit open-source repositories for security, privacy, and licensing issues."""
 
 
+@cli.command("check", context_settings=CONTEXT)
+def check():
+    """ 
+    Check what tools are installed on the machine oss-audit is running on 
+    """
+    _print_tool_check()
+    return
+
 # ── scan subcommand ────────────────────────────────────────────────────────────
 
 @cli.command("scan", context_settings=CONTEXT)
@@ -162,16 +170,11 @@ def cli():
     help="Output format(s). 'all' writes HTML + MD + JSON.",
 )
 @click.option(
-    "--check-tools", "do_check_tools",
-    is_flag=True, default=False,
-    help="Print tool availability and exit.",
-)
-@click.option(
     "--include-tests",
     is_flag=True, default=False,
     help="Include test files in semgrep, trivy, and telemetry scans.",
 )
-def scan(repo_url, profile, output, fmt, do_check_tools, include_tests):
+def scan(repo_url, profile, output, fmt, include_tests):
     """
     Audit a GitHub repository.
 
@@ -181,10 +184,6 @@ def scan(repo_url, profile, output, fmt, do_check_tools, include_tests):
       oss-audit scan https://github.com/org/repo --profile standard
       oss-audit scan https://github.com/org/repo --format all
     """
-    if do_check_tools:
-        _print_tool_check()
-        return
-
     # First-run notice before creating ~/.oss-audit/.
     if output is None and _default_reports_dir_is_new():
         console.print()

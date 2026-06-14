@@ -24,3 +24,15 @@ include = ["oss_audit*"]
 
 [tool.uv]
 package = true
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+markers = [
+    "e2e: end-to-end test that runs the real scanner tools over the network (deselect with '-m \"not e2e\"')",
+]
