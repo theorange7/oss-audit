@@ -50,8 +50,7 @@ def test_severity_rank_sorts_findings():
     assert sorted(sevs, key=severity_rank) == ["critical", "high", "medium", "low", "info"]
 
 
-# score_to_severity is exposed privately on the module; reach it via import.
-from oss_audit.runner import _score_to_severity  # noqa: E402
+from oss_audit.severity import score_to_severity  # noqa: E402
 
 
 @pytest.mark.parametrize("score, expected", [
@@ -66,4 +65,4 @@ from oss_audit.runner import _score_to_severity  # noqa: E402
     (10, "info"),
 ])
 def test_score_to_severity_boundaries(score, expected):
-    assert _score_to_severity(score) == expected
+    assert score_to_severity(score) == expected
