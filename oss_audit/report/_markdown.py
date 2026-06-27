@@ -2,7 +2,9 @@
 
 from ..models import AuditResult
 from ..severity import severity_rank
-from ._common import VERDICT_EMOJI, CAT_LABELS, all_findings
+from ._common import (
+    VERDICT_EMOJI, CAT_LABELS, all_findings, scanned_by, display_scanner,
+)
 
 
 def to_markdown(result: AuditResult) -> str:
@@ -37,21 +39,32 @@ def to_markdown(result: AuditResult) -> str:
     lines += ["", "---", "", "## Rubric Details", ""]
     for r in result.rubric:
         e = VERDICT_EMOJI.get(r.verdict, "?")
+        cat_findings = [f for f in all_findings(result) if f.category == r.category]
+
+        # Scanner attribution: who scanned this category (even if it found nothing).
+        ran, not_installed = scanned_by(result, r.category)
+        scanned_str = ", ".join(display_scanner(s) for s in ran) if ran else "—"
+        n = len(cat_findings)
+        scanned_line = f"**Scanned by:** {scanned_str} · {n} finding{'s' if n != 1 else ''}  "
+
         lines += [
             f"### {e} {CAT_LABELS.get(r.category, r.category)}",
             f"**Verdict:** {r.verdict}  ",
-            f"**Reason:** {r.reason}",
-            "",
+            f"**Reason:** {r.reason}  ",
+            scanned_line,
         ]
-        cat_findings = [f for f in all_findings(result) if f.category == r.category]
+        if not_installed:
+            lines.append(f"**Not installed:** {', '.join(f'`{t}`' for t in not_installed)}  ")
+        lines.append("")
+
         if cat_findings:
             # Show top 10 by severity
             cat_findings.sort(key=lambda f: severity_rank(f.severity))
-            lines += ["| Severity | Title | Location |",
-                      "|---|---|---|"]
+            lines += ["| Severity | Title | Scanner | Location |",
+                      "|---|---|---|---|"]
             for f in cat_findings[:10]:
                 loc = f.location or "—"
-                lines.append(f"| `{f.severity}` | {f.title} | `{loc}` |")
+                lines.append(f"| `{f.severity}` | {f.title} | `{f.scanner}` | `{loc}` |")
             if len(cat_findings) > 10:
                 lines.append(f"_…and {len(cat_findings)-10} more. See JSON output for full list._")
             lines.append("")
