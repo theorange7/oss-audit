@@ -13,7 +13,9 @@ RUBRIC_THRESHOLDS = {
         "secret":    {"fail_critical": 1, "fail_high": 1,  "warn_high": 1},
         "license":   {"fail_high": 1,     "warn_medium": 1},
         "health":    {"fail_high": 3,     "warn_high": 1},
-        "telemetry": {"fail_high": 3,     "warn_medium": 1},
+        # Telemetry is advisory: grep patterns are heuristic, so we surface them
+        # for review rather than failing the audit outright.
+        "telemetry": {"warn_high": 1,     "warn_medium": 1},
         "static":    {"fail_critical": 1, "fail_high": 10, "warn_high": 3},
     },
     "privacy": {
@@ -22,7 +24,8 @@ RUBRIC_THRESHOLDS = {
         "secret":    {"fail_critical": 1, "fail_high": 1,  "warn_high": 1},
         "license":   {"fail_high": 1,     "warn_medium": 1},
         "health":    {"fail_high": 2,     "warn_high": 1},
-        "telemetry": {"fail_high": 1,     "warn_medium": 1},
+        # Advisory even under privacy — flag for review, don't hard-fail on a heuristic.
+        "telemetry": {"warn_high": 1,     "warn_medium": 1},
         "static":    {"fail_critical": 1, "fail_high": 5,  "warn_high": 1},
     },
 }
@@ -62,7 +65,11 @@ def apply_rubric(tool_results: list[ToolResult], profile: str) -> tuple[list[Rub
         elif counts["high"] >= thresh.get("warn_high", 999) or counts["medium"] >= thresh.get("warn_medium", 999):
             if verdict != "FAIL":
                 verdict = "WARN"
-                reason = f"{counts['high']} high / {counts['medium']} medium issue(s) — review recommended."
+                if cat == "telemetry":
+                    reason = (f"{counts['high']} high / {counts['medium']} medium telemetry/PII "
+                              f"signal(s) — heuristic matches; review before use.")
+                else:
+                    reason = f"{counts['high']} high / {counts['medium']} medium issue(s) — review recommended."
 
         scores.append(RubricScore(
             category=cat,

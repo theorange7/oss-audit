@@ -72,6 +72,18 @@ def test_overall_is_worst_category():
     assert overall == "FAIL"
 
 
+def test_telemetry_is_advisory_never_fails():
+    # Telemetry is heuristic, so even many high-severity signals cap at WARN
+    # (with "review before use" language) under both profiles — never FAIL.
+    findings = [make_finding(category="telemetry", severity="high") for _ in range(5)]
+    for profile in ("standard", "privacy"):
+        scores, overall, _ = apply_rubric([make_tool_result(findings=findings)], profile)
+        tel = _scores_by_cat(scores)["telemetry"]
+        assert tel.verdict == "WARN", profile
+        assert "review before use" in tel.reason
+        assert overall != "FAIL", profile
+
+
 def test_findings_aggregate_across_tool_results():
     # Two separate tool results contributing to the same category should sum.
     tr1 = make_tool_result(tool="grype", findings=[make_finding(category="vuln", severity="high")])
