@@ -20,7 +20,7 @@ CAT_LABELS = {
 }
 
 
-def tool_findings(result: AuditResult, category: str | None = None) -> list[Finding]:
+def scanner_findings(result: AuditResult, category: str | None = None) -> list[Finding]:
     findings = []
     for tr in result.scan_results:
         for f in tr.findings:
@@ -30,4 +30,4 @@ def tool_findings(result: AuditResult, category: str | None = None) -> list[Find
 
 
 def all_findings(result: AuditResult) -> list[Finding]:
-    return tool_findings(result)
+    return scanner_findings(result)

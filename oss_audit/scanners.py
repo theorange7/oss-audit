@@ -1,5 +1,5 @@
 """
-scanners.py — tool availability, the subprocess helper, and one run_<tool>
+scanners.py — scanner availability, the subprocess helper, and one run_<scanner>
 function per scanner. Each returns a ScanResult with normalised Findings.
 """
 
@@ -32,7 +32,7 @@ TEST_FILE_GLOBS: tuple[str, ...] = (
 )
 
 
-# ── tool availability ──────────────────────────────────────────────────────────
+# ── scanner availability ──────────────────────────────────────────────────────────
 
 SCANNERS = {
     "git":        "git",

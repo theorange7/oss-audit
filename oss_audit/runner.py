@@ -1,5 +1,5 @@
 """
-runner.py — orchestrates all scanning tools and returns a unified AuditResult.
+runner.py — orchestrates all scanners and returns a unified AuditResult.
 
 The data model, severity helpers, individual scanners, and rubric engine live in
 their own modules (models / severity / scanners / rubric). They are re-exported
@@ -48,12 +48,12 @@ def audit(
     """
     Run a full audit of repo_url under the given profile.
 
-    on_event(tool, status) is called as each tool transitions state:
+    on_event(scanner, status) is called as each scanner transitions state:
       status is one of: "started", "done", "skipped", "error"
     """
-    def notify(tool: str, status: str):
+    def notify(scanner: str, status: str):
         if on_event:
-            on_event(tool, status)
+            on_event(scanner, status)
 
     repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
     result = AuditResult(
@@ -103,7 +103,7 @@ def audit(
                 notify(name, "done")
                 return tr, sbom
 
-            # Submit all clone-independent tools in parallel.
+            # Submit all clone-independent scanners in parallel.
             syft_future   = pool.submit(_run_syft, "syft")
             trivy_fut     = pool.submit(_run, "trivy",      run_trivy,          repo_path, available, skip_tests)
             gitleaks_fut  = pool.submit(_run, "gitleaks",   run_gitleaks,       repo_path, available)

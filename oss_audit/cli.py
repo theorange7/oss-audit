@@ -27,7 +27,7 @@ console = Console()
 
 DEFAULT_REPORTS_DIR = Path.home() / ".oss-audit" / "reports"
 
-TOOL_LABEL = {
+SCANNER_LABEL = {
     "git":         "git clone",
     "syft":        "syft  (SBOM)",
     "grype":       "grype  (vulns)",
@@ -40,7 +40,7 @@ TOOL_LABEL = {
     "scorecard":   "scorecard  (health)",
 }
 
-TOOL_ORDER = list(TOOL_LABEL.keys())
+SCANNER_ORDER = list(SCANNER_LABEL.keys())
 
 STATUS_STYLE = {
     "waiting":  ("dim",    "·  waiting"),
@@ -73,25 +73,25 @@ CAT_LABELS = {
 class ProgressTracker:
     def __init__(self):
         self._lock = threading.Lock()
-        self._status: dict[str, str] = {t: "waiting" for t in TOOL_ORDER}
+        self._status: dict[str, str] = {t: "waiting" for t in SCANNER_ORDER}
         self._started_at: dict[str, float] = {}
         self._elapsed: dict[str, float] = {}
         self._findings: dict[str, int] = {}
         self._wall_start = time.monotonic()
 
-    def update(self, tool: str, status: str):
+    def update(self, scanner: str, status: str):
         now = time.monotonic()
         with self._lock:
-            self._status[tool] = status
+            self._status[scanner] = status
             if status == "started":
-                self._started_at[tool] = now
+                self._started_at[scanner] = now
             elif status in ("done", "skipped", "error"):
-                t0 = self._started_at.get(tool)
-                self._elapsed[tool] = (now - t0) if t0 else 0.0
+                t0 = self._started_at.get(scanner)
+                self._elapsed[scanner] = (now - t0) if t0 else 0.0
 
-    def set_findings(self, tool: str, count: int):
+    def set_findings(self, scanner: str, count: int):
         with self._lock:
-            self._findings[tool] = count
+            self._findings[scanner] = count
 
     def wall_elapsed(self) -> float:
         return time.monotonic() - self._wall_start
@@ -99,26 +99,26 @@ class ProgressTracker:
     def render(self) -> Table:
         t = Table(box=box.SIMPLE, show_header=True, header_style="dim", expand=False,
                   padding=(0, 1))
-        t.add_column("Tool",     style="bold", min_width=28)
+        t.add_column("Scanner",     style="bold", min_width=28)
         t.add_column("Status",   min_width=14)
         t.add_column("Time",     justify="right", min_width=6)
         t.add_column("Findings", justify="right", min_width=8)
 
         with self._lock:
-            for tool in TOOL_ORDER:
-                st = self._status.get(tool, "waiting")
+            for scanner in SCANNER_ORDER:
+                st = self._status.get(scanner, "waiting")
                 sty, label = STATUS_STYLE.get(st, ("dim", st))
 
                 if st == "started":
-                    t0 = self._started_at.get(tool)
+                    t0 = self._started_at.get(scanner)
                     time_str = f"{(time.monotonic() - t0):.1f}s" if t0 else "—"
                 else:
-                    elapsed = self._elapsed.get(tool)
+                    elapsed = self._elapsed.get(scanner)
                     time_str = f"{elapsed:.1f}s" if elapsed else "—"
 
-                findings = self._findings.get(tool)
+                findings = self._findings.get(scanner)
                 t.add_row(
-                    TOOL_LABEL.get(tool, tool),
+                    SCANNER_LABEL.get(scanner, scanner),
                     Text(label, style=sty),
                     time_str,
                     str(findings) if findings is not None else "—",
@@ -139,9 +139,9 @@ def cli():
 @cli.command("check", context_settings=CONTEXT)
 def check():
     """ 
-    Check what tools are installed on the machine oss-audit is running on 
+    Check what scanners are installed on the machine oss-audit is running on 
     """
-    _print_tool_check()
+    _print_scanner_check()
     return
 
 # ── scan subcommand ────────────────────────────────────────────────────────────
@@ -465,12 +465,12 @@ def _sev_cell(n: int, color: str) -> str:
     return f"[bold {color}]{n}[/]" if n else "[dim]0[/]"
 
 
-# ── tool check ─────────────────────────────────────────────────────────────────
+# ── scanner check ─────────────────────────────────────────────────────────────────
 
-def _print_tool_check():
+def _print_scanner_check():
     available = check_scanners()
     console.print()
-    console.print("[bold]Tool availability:[/]")
+    console.print("[bold]Scanner availability:[/]")
     console.print()
     for name, present in available.items():
         icon = "[green]✅[/]" if present else "[dim]❌[/]"
@@ -478,11 +478,11 @@ def _print_tool_check():
     console.print()
     missing = [n for n, p in available.items() if not p]
     if missing:
-        console.print("  [dim]Missing tools will be skipped during audits.[/]")
+        console.print("  [dim]Missing scanners will be skipped during audits.[/]")
         console.print(f"  [dim]Install via:[/] [cyan]brew install {' '.join(missing)}[/]")
         console.print("  [dim]Or use the Docker image for full coverage.[/]")
     else:
-        console.print("  [green]All tools available. Full coverage enabled.[/]")
+        console.print("  [green]All scanners available. Full coverage enabled.[/]")
     console.print()
 
 

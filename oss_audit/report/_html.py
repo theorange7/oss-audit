@@ -73,13 +73,13 @@ def to_html(result: AuditResult) -> str:
         </section>"""
 
     # Scanner coverage rows
-    tool_rows = ""
+    scanner_rows = ""
     for tr in result.scan_results:
         avail_html = '<span class="pill-ok">available</span>' if tr.available else '<span class="pill-skip">skipped</span>'
         ran_html   = '<span class="pill-ok">ran</span>' if tr.ran else '—'
         dur        = f"{tr.duration_s:.1f}s" if tr.ran else "—"
         err_html   = f'<span class="scanner-error">{tr.error[:80]}</span>' if tr.error else ""
-        tool_rows += f"""
+        scanner_rows += f"""
         <tr>
           <td><code class="scanner-name">{tr.scanner}</code></td>
           <td>{avail_html}</td>
@@ -330,7 +330,7 @@ def to_html(result: AuditResult) -> str:
   .finding-loc code {{ font-family: var(--mono); font-size: 11px; color: #7c86a2; word-break: break-all; }}
   .overflow-note {{ font-size: 12px; color: var(--text-muted); padding: 0.5rem 0.75rem; font-style: italic; }}
 
-  /* ── tool coverage ── */
+  /* ── scanner coverage ── */
   .scanner-name {{ color: #a5b4fc; }}
   .scanner-error {{ color: #f87171; font-size: 11px; }}
 
@@ -412,7 +412,7 @@ def to_html(result: AuditResult) -> str:
     <thead>
       <tr><th>Scanner</th><th>Available</th><th>Ran</th><th>Findings</th><th>Duration</th><th>Error</th></tr>
     </thead>
-    <tbody>{tool_rows}</tbody>
+    <tbody>{scanner_rows}</tbody>
   </table>
   {skipped_note}
 
