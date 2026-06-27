@@ -18,8 +18,8 @@ from .severity import (
 )
 from .rubric import RUBRIC_THRESHOLDS, apply_rubric
 from .scanners import (
-    TOOLS, TEST_DIR_NAMES, TEST_FILE_GLOBS,
-    check_tools, run_cmd,
+    SCANNERS, TEST_DIR_NAMES, TEST_FILE_GLOBS,
+    check_scanners, run_cmd,
     run_syft, run_grype, run_trivy, run_gitleaks, run_semgrep,
     run_osv, run_scorecard, run_license_scan, run_telemetry_scan,
     parse_grype, parse_trivy, parse_semgrep, parse_osv, parse_scorecard, parse_gitleaks,
@@ -29,7 +29,7 @@ __all__ = [
     "Finding", "ScanResult", "CategoryVerdict", "AuditResult",
     "SEVERITY_LEVELS", "severity_rank", "normalise_sev", "score_to_severity",
     "RUBRIC_THRESHOLDS", "apply_rubric",
-    "TOOLS", "TEST_DIR_NAMES", "TEST_FILE_GLOBS", "check_tools", "run_cmd",
+    "SCANNERS", "TEST_DIR_NAMES", "TEST_FILE_GLOBS", "check_scanners", "run_cmd",
     "run_syft", "run_grype", "run_trivy", "run_gitleaks", "run_semgrep",
     "run_osv", "run_scorecard", "run_license_scan", "run_telemetry_scan",
     "parse_grype", "parse_trivy", "parse_semgrep", "parse_osv", "parse_scorecard", "parse_gitleaks",
@@ -63,7 +63,7 @@ def audit(
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
-    available = check_tools()
+    available = check_scanners()
 
     with tempfile.TemporaryDirectory(prefix="oss-audit-") as tmpdir:
         repo_path = os.path.join(tmpdir, repo_name)

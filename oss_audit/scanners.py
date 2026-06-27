@@ -34,7 +34,7 @@ TEST_FILE_GLOBS: tuple[str, ...] = (
 
 # ── tool availability ──────────────────────────────────────────────────────────
 
-TOOLS = {
+SCANNERS = {
     "git":        "git",
     "syft":       "syft",
     "grype":      "grype",
@@ -46,8 +46,8 @@ TOOLS = {
     "trivy":      "trivy",
 }
 
-def check_tools() -> dict[str, bool]:
-    return {name: shutil.which(cmd) is not None for name, cmd in TOOLS.items()}
+def check_scanners() -> dict[str, bool]:
+    return {name: shutil.which(cmd) is not None for name, cmd in SCANNERS.items()}
 
 
 # ── helpers ────────────────────────────────────────────────────────────────────

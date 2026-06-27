@@ -18,7 +18,7 @@ from rich.table import Table
 from rich.text import Text
 from rich import box
 
-from .runner import audit, check_tools
+from .runner import audit, check_scanners
 from .report import to_json, to_markdown, to_html
 
 console = Console()
@@ -223,9 +223,9 @@ def scan(repo_url, profile, output, fmt, include_tests):
             skip_tests=not include_tests,
         )
 
-        _tool_key = {"telemetry-grep": "telemetry"}
+        _scanner_key = {"telemetry-grep": "telemetry"}
         for tr in result.tool_results:
-            tracker.set_findings(_tool_key.get(tr.scanner, tr.scanner), len(tr.findings))
+            tracker.set_findings(_scanner_key.get(tr.scanner, tr.scanner), len(tr.findings))
 
         done_event.set()
         refresh_thread.join()
@@ -468,7 +468,7 @@ def _sev_cell(n: int, color: str) -> str:
 # ── tool check ─────────────────────────────────────────────────────────────────
 
 def _print_tool_check():
-    available = check_tools()
+    available = check_scanners()
     console.print()
     console.print("[bold]Tool availability:[/]")
     console.print()

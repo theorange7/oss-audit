@@ -14,7 +14,7 @@ import socket
 
 import pytest
 
-from oss_audit.runner import audit, check_tools
+from oss_audit.runner import audit, check_scanners
 from oss_audit.report import to_json, to_markdown, to_html
 
 # Tiny, stable, dependency-free repository — fast to clone.
@@ -32,7 +32,7 @@ def _network_available(host: str = "github.com", port: int = 443, timeout: float
 
 @pytest.mark.e2e
 def test_e2e_real_audit_is_well_formed():
-    if not check_tools().get("git"):
+    if not check_scanners().get("git"):
         pytest.skip("git is not installed")
     if not _network_available():
         pytest.skip("no network access to github.com")
@@ -56,7 +56,7 @@ def test_e2e_real_audit_is_well_formed():
     assert "telemetry-grep" in ran_tools
 
     # Any scanner reported as available must have actually run.
-    available = check_tools()
+    available = check_scanners()
     for tr in result.tool_results:
         if tr.available:
             assert tr.ran, f"{tr.scanner} was available but did not run"
