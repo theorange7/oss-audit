@@ -72,16 +72,16 @@ def to_html(result: AuditResult) -> str:
           {overflow}
         </section>"""
 
-    # Tool coverage rows
+    # Scanner coverage rows
     tool_rows = ""
     for tr in result.scan_results:
         avail_html = '<span class="pill-ok">available</span>' if tr.available else '<span class="pill-skip">skipped</span>'
         ran_html   = '<span class="pill-ok">ran</span>' if tr.ran else '—'
         dur        = f"{tr.duration_s:.1f}s" if tr.ran else "—"
-        err_html   = f'<span class="tool-error">{tr.error[:80]}</span>' if tr.error else ""
+        err_html   = f'<span class="scanner-error">{tr.error[:80]}</span>' if tr.error else ""
         tool_rows += f"""
         <tr>
-          <td><code class="tool-name">{tr.scanner}</code></td>
+          <td><code class="scanner-name">{tr.scanner}</code></td>
           <td>{avail_html}</td>
           <td>{ran_html}</td>
           <td class="num">{len(tr.findings)}</td>
@@ -331,8 +331,8 @@ def to_html(result: AuditResult) -> str:
   .overflow-note {{ font-size: 12px; color: var(--text-muted); padding: 0.5rem 0.75rem; font-style: italic; }}
 
   /* ── tool coverage ── */
-  .tool-name {{ color: #a5b4fc; }}
-  .tool-error {{ color: #f87171; font-size: 11px; }}
+  .scanner-name {{ color: #a5b4fc; }}
+  .scanner-error {{ color: #f87171; font-size: 11px; }}
 
   /* ── misc ── */
   .skipped-note {{
@@ -407,10 +407,10 @@ def to_html(result: AuditResult) -> str:
   <div class="section-title">Findings by Category</div>
   {finding_sections}
 
-  <div class="section-title">Tool Coverage</div>
+  <div class="section-title">Scanner Coverage</div>
   <table class="summary-table">
     <thead>
-      <tr><th>Tool</th><th>Available</th><th>Ran</th><th>Findings</th><th>Duration</th><th>Error</th></tr>
+      <tr><th>Scanner</th><th>Available</th><th>Ran</th><th>Findings</th><th>Duration</th><th>Error</th></tr>
     </thead>
     <tbody>{tool_rows}</tbody>
   </table>

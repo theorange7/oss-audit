@@ -56,9 +56,9 @@ def to_markdown(result: AuditResult) -> str:
                 lines.append(f"_…and {len(cat_findings)-10} more. See JSON output for full list._")
             lines.append("")
 
-    # Tool coverage
-    lines += ["---", "", "## Tool Coverage", "",
-              "| Tool | Available | Ran | Findings | Duration |",
+    # Scanner coverage
+    lines += ["---", "", "## Scanner Coverage", "",
+              "| Scanner | Available | Ran | Findings | Duration |",
               "|---|---|---|---|---|"]
     for tr in result.scan_results:
         avail = "✅" if tr.available else "⬜ skipped"
@@ -68,7 +68,7 @@ def to_markdown(result: AuditResult) -> str:
 
     if result.skipped_scanners:
         lines += ["",
-                  f"> **Skipped tools** (not installed): {', '.join(f'`{t}`' for t in result.skipped_scanners)}",
+                  f"> **Skipped scanners** (not installed): {', '.join(f'`{t}`' for t in result.skipped_scanners)}",
                   "> Install them to improve coverage."]
 
     lines += ["", "---", "",
