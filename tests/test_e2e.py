@@ -52,14 +52,14 @@ def test_e2e_real_audit_is_well_formed():
     assert result.timestamp
 
     # The telemetry grep needs no external binary, so it always runs.
-    ran_tools = {tr.tool for tr in result.tool_results if tr.ran}
+    ran_tools = {tr.scanner for tr in result.tool_results if tr.ran}
     assert "telemetry-grep" in ran_tools
 
     # Any scanner reported as available must have actually run.
     available = check_tools()
     for tr in result.tool_results:
         if tr.available:
-            assert tr.ran, f"{tr.tool} was available but did not run"
+            assert tr.ran, f"{tr.scanner} was available but did not run"
 
     # The real result must render in all three formats without error.
     data = json.loads(to_json(result))

@@ -8,7 +8,7 @@ from typing import Optional
 
 @dataclass
 class Finding:
-    tool: str
+    scanner: str
     severity: str          # critical / high / medium / low / info
     category: str          # vuln / secret / license / health / telemetry / static
     title: str
@@ -18,7 +18,7 @@ class Finding:
 
 @dataclass
 class ScanResult:
-    tool: str
+    scanner: str
     available: bool
     ran: bool
     findings: list[Finding] = field(default_factory=list)

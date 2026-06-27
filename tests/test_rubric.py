@@ -86,7 +86,7 @@ def test_telemetry_is_advisory_never_fails():
 
 def test_findings_aggregate_across_tool_results():
     # Two separate tool results contributing to the same category should sum.
-    tr1 = make_tool_result(tool="grype", findings=[make_finding(category="vuln", severity="high")])
-    tr2 = make_tool_result(tool="trivy", findings=[make_finding(category="vuln", severity="high")])
+    tr1 = make_tool_result(scanner="grype", findings=[make_finding(category="vuln", severity="high")])
+    tr2 = make_tool_result(scanner="trivy", findings=[make_finding(category="vuln", severity="high")])
     scores, _, _ = apply_rubric([tr1, tr2], "standard")
     assert _scores_by_cat(scores)["vuln"].high_count == 2

@@ -70,7 +70,7 @@ def run_cmd(cmd: list[str], cwd: str = None, timeout: int = 300, extra_env: dict
 
 def run_syft(repo_path: str, available: dict) -> tuple[ScanResult, Optional[str]]:
     """Generate SBOM with syft. Returns (ScanResult, sbom_path|None)."""
-    tr = ScanResult(tool="syft", available=available.get("syft", False), ran=False)
+    tr = ScanResult(scanner="syft", available=available.get("syft", False), ran=False)
     sbom_path = None
     if not tr.available:
         return tr, sbom_path
@@ -93,7 +93,7 @@ def run_syft(repo_path: str, available: dict) -> tuple[ScanResult, Optional[str]
                 sbom = json.load(f)
             pkg_count = len(sbom.get("artifacts", []))
             tr.findings.append(Finding(
-                tool="syft", severity="info", category="vuln",
+                scanner="syft", severity="info", category="vuln",
                 title=f"SBOM generated: {pkg_count} packages",
                 detail=f"Software Bill of Materials created at {sbom_path}"
             ))
@@ -109,7 +109,7 @@ def parse_grype(data: dict) -> list[Finding]:
         pkg = m.get("artifact", {})
         sev = normalise_sev(vuln.get("severity", "info"))
         findings.append(Finding(
-            tool="grype",
+            scanner="grype",
             severity=sev,
             category="vuln",
             title=f"{vuln.get('id','?')} in {pkg.get('name','?')} {pkg.get('version','?')}",
@@ -120,7 +120,7 @@ def parse_grype(data: dict) -> list[Finding]:
 
 
 def run_grype(repo_path: str, available: dict, sbom_path: Optional[str]) -> ScanResult:
-    tr = ScanResult(tool="grype", available=available.get("grype", False), ran=False)
+    tr = ScanResult(scanner="grype", available=available.get("grype", False), ran=False)
     if not tr.available:
         return tr
 
@@ -147,7 +147,7 @@ def parse_trivy(data: dict) -> list[Finding]:
         for v in result.get("Vulnerabilities", []) or []:
             sev = normalise_sev(v.get("Severity", "info"))
             findings.append(Finding(
-                tool="trivy",
+                scanner="trivy",
                 severity=sev,
                 category="vuln",
                 title=f"{v.get('VulnerabilityID','?')} in {v.get('PkgName','?')} {v.get('InstalledVersion','?')}",
@@ -156,7 +156,7 @@ def parse_trivy(data: dict) -> list[Finding]:
             ))
         for s in result.get("Secrets", []) or []:
             findings.append(Finding(
-                tool="trivy",
+                scanner="trivy",
                 severity="high",
                 category="secret",
                 title=f"Secret: {s.get('Title','?')}",
@@ -168,7 +168,7 @@ def parse_trivy(data: dict) -> list[Finding]:
 
 def run_trivy(repo_path: str, available: dict, skip_tests: bool = True) -> ScanResult:
     """Trivy as fallback / complement to grype+syft."""
-    tr = ScanResult(tool="trivy", available=available.get("trivy", False), ran=False)
+    tr = ScanResult(scanner="trivy", available=available.get("trivy", False), ran=False)
     if not tr.available:
         return tr
     t0 = time.time()
@@ -197,7 +197,7 @@ def parse_gitleaks(leaks: list) -> list[Finding]:
     findings = []
     for leak in leaks or []:
         findings.append(Finding(
-            tool="gitleaks",
+            scanner="gitleaks",
             severity="high",
             category="secret",
             title=f"Secret detected: {leak.get('Description', leak.get('RuleID','?'))}",
@@ -208,7 +208,7 @@ def parse_gitleaks(leaks: list) -> list[Finding]:
 
 
 def run_gitleaks(repo_path: str, available: dict) -> ScanResult:
-    tr = ScanResult(tool="gitleaks", available=available.get("gitleaks", False), ran=False)
+    tr = ScanResult(scanner="gitleaks", available=available.get("gitleaks", False), ran=False)
     if not tr.available:
         return tr
     report_path = os.path.join(repo_path, "_gitleaks.json")
@@ -236,7 +236,7 @@ def parse_semgrep(data: dict) -> list[Finding]:
     for r in data.get("results", []):
         sev = normalise_sev(r.get("extra", {}).get("severity", "info"))
         findings.append(Finding(
-            tool="semgrep",
+            scanner="semgrep",
             severity=sev,
             category="static",
             title=r.get("check_id", "?").split(".")[-1],
@@ -247,7 +247,7 @@ def parse_semgrep(data: dict) -> list[Finding]:
 
 
 def run_semgrep(repo_path: str, available: dict, skip_tests: bool = True) -> ScanResult:
-    tr = ScanResult(tool="semgrep", available=available.get("semgrep", False), ran=False)
+    tr = ScanResult(scanner="semgrep", available=available.get("semgrep", False), ran=False)
     if not tr.available:
         return tr
     t0 = time.time()
@@ -290,7 +290,7 @@ def parse_osv(data: dict) -> list[Finding]:
                     except ValueError:
                         pass
                 findings.append(Finding(
-                    tool="osv-scanner",
+                    scanner="osv-scanner",
                     severity=sev,
                     category="vuln",
                     title=f"{vuln.get('id','?')} in {pkg.get('package',{}).get('name','?')}",
@@ -300,7 +300,7 @@ def parse_osv(data: dict) -> list[Finding]:
 
 
 def run_osv(repo_path: str, available: dict) -> ScanResult:
-    tr = ScanResult(tool="osv-scanner", available=available.get("osv-scanner", False), ran=False)
+    tr = ScanResult(scanner="osv-scanner", available=available.get("osv-scanner", False), ran=False)
     if not tr.available:
         return tr
     t0 = time.time()
@@ -331,7 +331,7 @@ def parse_scorecard(data: dict) -> list[Finding]:
 
     if aggregate >= 0:
         findings.append(Finding(
-            tool="scorecard",
+            scanner="scorecard",
             severity=score_to_severity(aggregate),
             category="health",
             title=f"OpenSSF Scorecard aggregate: {aggregate:.1f}/10",
@@ -360,7 +360,7 @@ def parse_scorecard(data: dict) -> list[Finding]:
 
         score_str = f"{score}/10" if score >= 0 else "N/A"
         findings.append(Finding(
-            tool="scorecard",
+            scanner="scorecard",
             severity=sev,
             category="health",
             title=f"{name}: {score_str}",
@@ -371,7 +371,7 @@ def parse_scorecard(data: dict) -> list[Finding]:
 
 
 def run_scorecard(repo_url: str, available: dict) -> ScanResult:
-    tr = ScanResult(tool="scorecard", available=available.get("scorecard", False), ran=False)
+    tr = ScanResult(scanner="scorecard", available=available.get("scorecard", False), ran=False)
     if not tr.available:
         return tr
 
@@ -415,7 +415,7 @@ def run_scorecard(repo_url: str, available: dict) -> ScanResult:
 
 def run_license_scan(repo_path: str, available: dict) -> ScanResult:
     """Use licensee if available, otherwise grep for LICENSE files."""
-    tr = ScanResult(tool="licensee", available=available.get("licensee", False), ran=False)
+    tr = ScanResult(scanner="licensee", available=available.get("licensee", False), ran=False)
     tr.ran = True  # we always do something here
 
     if available.get("licensee", False):
@@ -432,7 +432,7 @@ def run_license_scan(repo_path: str, available: dict) -> ScanResult:
                 copyleft = any(x in spdx for x in ["GPL", "AGPL", "LGPL", "EUPL", "CDDL"])
                 sev = "high" if copyleft else "info"
                 tr.findings.append(Finding(
-                    tool="licensee",
+                    scanner="licensee",
                     severity=sev,
                     category="license",
                     title=f"License: {spdx}",
@@ -464,7 +464,7 @@ def run_license_scan(repo_path: str, available: dict) -> ScanResult:
                 else:
                     sev, label = "medium", "License detected but type unclear — review manually"
                 tr.findings.append(Finding(
-                    tool="licensee",
+                    scanner="licensee",
                     severity=sev,
                     category="license",
                     title=f"License: {label}",
@@ -473,7 +473,7 @@ def run_license_scan(repo_path: str, available: dict) -> ScanResult:
                 break
         else:
             tr.findings.append(Finding(
-                tool="licensee",
+                scanner="licensee",
                 severity="medium",
                 category="license",
                 title="No LICENSE file found",
@@ -484,7 +484,7 @@ def run_license_scan(repo_path: str, available: dict) -> ScanResult:
 
 def run_telemetry_scan(repo_path: str, skip_tests: bool = True) -> ScanResult:
     """Grep-based scan for telemetry/analytics calls and PII patterns."""
-    tr = ScanResult(tool="telemetry-grep", available=True, ran=True)
+    tr = ScanResult(scanner="telemetry-grep", available=True, ran=True)
 
     telemetry_patterns = [
         (r"(mixpanel|amplitude|segment\.com|heap\.io|fullstory|hotjar|"
@@ -522,7 +522,7 @@ def run_telemetry_scan(repo_path: str, skip_tests: bool = True) -> ScanResult:
                             if re.search(pattern, line, re.I):
                                 sev = "high" if "credential" in label.lower() else "medium"
                                 tr.findings.append(Finding(
-                                    tool="telemetry-grep",
+                                    scanner="telemetry-grep",
                                     severity=sev,
                                     category="telemetry",
                                     title=label,

@@ -225,7 +225,7 @@ def scan(repo_url, profile, output, fmt, include_tests):
 
         _tool_key = {"telemetry-grep": "telemetry"}
         for tr in result.tool_results:
-            tracker.set_findings(_tool_key.get(tr.tool, tr.tool), len(tr.findings))
+            tracker.set_findings(_tool_key.get(tr.scanner, tr.scanner), len(tr.findings))
 
         done_event.set()
         refresh_thread.join()

@@ -81,7 +81,7 @@ def to_html(result: AuditResult) -> str:
         err_html   = f'<span class="tool-error">{tr.error[:80]}</span>' if tr.error else ""
         tool_rows += f"""
         <tr>
-          <td><code class="tool-name">{tr.tool}</code></td>
+          <td><code class="tool-name">{tr.scanner}</code></td>
           <td>{avail_html}</td>
           <td>{ran_html}</td>
           <td class="num">{len(tr.findings)}</td>

@@ -8,7 +8,7 @@ from ._common import all_findings
 
 def to_json(result: AuditResult) -> str:
     def finding_dict(f: Finding):
-        return {"tool": f.tool, "severity": f.severity, "category": f.category,
+        return {"tool": f.scanner, "severity": f.severity, "category": f.category,
                 "title": f.title, "detail": f.detail, "location": f.location}
 
     def rubric_dict(r: CategoryVerdict):
@@ -29,7 +29,7 @@ def to_json(result: AuditResult) -> str:
         "rubric": [rubric_dict(r) for r in result.rubric],
         "findings": [finding_dict(f) for f in all_findings(result)],
         "tool_summary": [
-            {"tool": tr.tool, "available": tr.available, "ran": tr.ran,
+            {"tool": tr.scanner, "available": tr.available, "ran": tr.ran,
              "duration_s": round(tr.duration_s, 2), "finding_count": len(tr.findings),
              "error": tr.error}
             for tr in result.tool_results

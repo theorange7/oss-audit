@@ -64,7 +64,7 @@ def to_markdown(result: AuditResult) -> str:
         avail = "✅" if tr.available else "⬜ skipped"
         ran   = "✅" if tr.ran else "—"
         dur   = f"{tr.duration_s:.1f}s" if tr.ran else "—"
-        lines.append(f"| {tr.tool} | {avail} | {ran} | {len(tr.findings)} | {dur} |")
+        lines.append(f"| {tr.scanner} | {avail} | {ran} | {len(tr.findings)} | {dur} |")
 
     if result.skipped_tools:
         lines += ["",

@@ -9,15 +9,15 @@ import pytest
 from oss_audit.runner import AuditResult, ScanResult, Finding, apply_rubric
 
 
-def make_finding(category="vuln", severity="high", tool="grype",
+def make_finding(category="vuln", severity="high", scanner="grype",
                  title="CVE-0001 in pkg 1.0", detail="a vulnerability", location="pkg.json"):
-    return Finding(tool=tool, severity=severity, category=category,
+    return Finding(scanner=scanner, severity=severity, category=category,
                    title=title, detail=detail, location=location)
 
 
-def make_tool_result(tool="grype", findings=None, available=True, ran=True,
+def make_tool_result(scanner="grype", findings=None, available=True, ran=True,
                      error="", duration_s=0.5):
-    return ScanResult(tool=tool, available=available, ran=ran,
+    return ScanResult(scanner=scanner, available=available, ran=ran,
                       findings=list(findings or []), error=error, duration_s=duration_s)
 
 
