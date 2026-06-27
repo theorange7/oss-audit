@@ -23,7 +23,7 @@ def make_scan_result(scanner="grype", findings=None, available=True, ran=True,
 
 @pytest.fixture
 def build_result():
-    """Return a factory that builds a fully-scored AuditResult from a list of Findings."""
+    """Return a factory that builds a fully-evaluated AuditResult from a list of Findings."""
     def _build(findings=None, profile="privacy", repo_name="myrepo", skipped_scanners=None):
         tr = make_scan_result(findings=findings or [])
         res = AuditResult(

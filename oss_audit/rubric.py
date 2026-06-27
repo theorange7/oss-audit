@@ -1,5 +1,5 @@
 """
-rubric.py — turns a list of ScanResults into per-category verdicts and an
+rubric.py — turns a list of ScanResults into per-category verdict_values and an
 overall PASS / WARN / FAIL under the selected profile.
 """
 
@@ -40,7 +40,7 @@ def apply_rubric(scan_results: list[ScanResult], profile: str) -> tuple[list[Cat
         for f in tr.findings:
             by_category.setdefault(f.category, []).append(f)
 
-    scores = []
+    verdicts = []
     for cat, thresh in thresholds.items():
         findings = by_category.get(cat, [])
         counts = {s: sum(1 for f in findings if f.severity == s)
@@ -71,7 +71,7 @@ def apply_rubric(scan_results: list[ScanResult], profile: str) -> tuple[list[Cat
                 else:
                     reason = f"{counts['high']} high / {counts['medium']} medium issue(s) — review recommended."
 
-        scores.append(CategoryVerdict(
+        verdicts.append(CategoryVerdict(
             category=cat,
             verdict=verdict,
             reason=reason,
@@ -82,15 +82,15 @@ def apply_rubric(scan_results: list[ScanResult], profile: str) -> tuple[list[Cat
         ))
 
     # Overall verdict: FAIL if any FAIL, WARN if any WARN, else PASS
-    verdicts = [s.verdict for s in scores]
-    if "FAIL" in verdicts:
+    verdict_values = [s.verdict for s in verdicts]
+    if "FAIL" in verdict_values:
         overall = "FAIL"
         overall_reason = "One or more categories failed the rubric. Review findings before deployment."
-    elif "WARN" in verdicts:
+    elif "WARN" in verdict_values:
         overall = "WARN"
         overall_reason = "Issues warrant manual review before use in sensitive environments."
     else:
         overall = "PASS"
         overall_reason = "No blocking issues detected under the selected profile."
 
-    return scores, overall, overall_reason
+    return verdicts, overall, overall_reason

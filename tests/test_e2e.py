@@ -47,13 +47,13 @@ def test_e2e_real_audit_is_well_formed():
     # ── structural assertions on a genuine run ──
     assert result.repo_name == E2E_REPO_NAME
     assert result.overall_verdict in {"PASS", "WARN", "FAIL"}
-    assert result.scan_results, "expected at least one tool result"
-    assert result.rubric, "expected rubric scores"
+    assert result.scan_results, "expected at least one scan result"
+    assert result.rubric, "expected rubric verdicts"
     assert result.timestamp
 
     # The telemetry grep needs no external binary, so it always runs.
-    ran_tools = {tr.scanner for tr in result.scan_results if tr.ran}
-    assert "telemetry-grep" in ran_tools
+    ran_scanners = {tr.scanner for tr in result.scan_results if tr.ran}
+    assert "telemetry-grep" in ran_scanners
 
     # Any scanner reported as available must have actually run.
     available = check_scanners()
