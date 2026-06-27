@@ -1,6 +1,6 @@
 """
 scanners.py — tool availability, the subprocess helper, and one run_<tool>
-function per scanner. Each returns a ToolResult with normalised Findings.
+function per scanner. Each returns a ScanResult with normalised Findings.
 """
 
 import subprocess
@@ -12,7 +12,7 @@ import time
 import fnmatch
 from typing import Optional
 
-from .models import Finding, ToolResult
+from .models import Finding, ScanResult
 from .severity import normalise_sev, score_to_severity
 
 
@@ -68,9 +68,9 @@ def run_cmd(cmd: list[str], cwd: str = None, timeout: int = 300, extra_env: dict
 
 # ── individual scanners ────────────────────────────────────────────────────────
 
-def run_syft(repo_path: str, available: dict) -> tuple[ToolResult, Optional[str]]:
-    """Generate SBOM with syft. Returns (ToolResult, sbom_path|None)."""
-    tr = ToolResult(tool="syft", available=available.get("syft", False), ran=False)
+def run_syft(repo_path: str, available: dict) -> tuple[ScanResult, Optional[str]]:
+    """Generate SBOM with syft. Returns (ScanResult, sbom_path|None)."""
+    tr = ScanResult(tool="syft", available=available.get("syft", False), ran=False)
     sbom_path = None
     if not tr.available:
         return tr, sbom_path
@@ -119,8 +119,8 @@ def parse_grype(data: dict) -> list[Finding]:
     return findings
 
 
-def run_grype(repo_path: str, available: dict, sbom_path: Optional[str]) -> ToolResult:
-    tr = ToolResult(tool="grype", available=available.get("grype", False), ran=False)
+def run_grype(repo_path: str, available: dict, sbom_path: Optional[str]) -> ScanResult:
+    tr = ScanResult(tool="grype", available=available.get("grype", False), ran=False)
     if not tr.available:
         return tr
 
@@ -166,9 +166,9 @@ def parse_trivy(data: dict) -> list[Finding]:
     return findings
 
 
-def run_trivy(repo_path: str, available: dict, skip_tests: bool = True) -> ToolResult:
+def run_trivy(repo_path: str, available: dict, skip_tests: bool = True) -> ScanResult:
     """Trivy as fallback / complement to grype+syft."""
-    tr = ToolResult(tool="trivy", available=available.get("trivy", False), ran=False)
+    tr = ScanResult(tool="trivy", available=available.get("trivy", False), ran=False)
     if not tr.available:
         return tr
     t0 = time.time()
@@ -207,8 +207,8 @@ def parse_gitleaks(leaks: list) -> list[Finding]:
     return findings
 
 
-def run_gitleaks(repo_path: str, available: dict) -> ToolResult:
-    tr = ToolResult(tool="gitleaks", available=available.get("gitleaks", False), ran=False)
+def run_gitleaks(repo_path: str, available: dict) -> ScanResult:
+    tr = ScanResult(tool="gitleaks", available=available.get("gitleaks", False), ran=False)
     if not tr.available:
         return tr
     report_path = os.path.join(repo_path, "_gitleaks.json")
@@ -246,8 +246,8 @@ def parse_semgrep(data: dict) -> list[Finding]:
     return findings
 
 
-def run_semgrep(repo_path: str, available: dict, skip_tests: bool = True) -> ToolResult:
-    tr = ToolResult(tool="semgrep", available=available.get("semgrep", False), ran=False)
+def run_semgrep(repo_path: str, available: dict, skip_tests: bool = True) -> ScanResult:
+    tr = ScanResult(tool="semgrep", available=available.get("semgrep", False), ran=False)
     if not tr.available:
         return tr
     t0 = time.time()
@@ -299,8 +299,8 @@ def parse_osv(data: dict) -> list[Finding]:
     return findings
 
 
-def run_osv(repo_path: str, available: dict) -> ToolResult:
-    tr = ToolResult(tool="osv-scanner", available=available.get("osv-scanner", False), ran=False)
+def run_osv(repo_path: str, available: dict) -> ScanResult:
+    tr = ScanResult(tool="osv-scanner", available=available.get("osv-scanner", False), ran=False)
     if not tr.available:
         return tr
     t0 = time.time()
@@ -370,8 +370,8 @@ def parse_scorecard(data: dict) -> list[Finding]:
     return findings
 
 
-def run_scorecard(repo_url: str, available: dict) -> ToolResult:
-    tr = ToolResult(tool="scorecard", available=available.get("scorecard", False), ran=False)
+def run_scorecard(repo_url: str, available: dict) -> ScanResult:
+    tr = ScanResult(tool="scorecard", available=available.get("scorecard", False), ran=False)
     if not tr.available:
         return tr
 
@@ -413,9 +413,9 @@ def run_scorecard(repo_url: str, available: dict) -> ToolResult:
     return tr
 
 
-def run_license_scan(repo_path: str, available: dict) -> ToolResult:
+def run_license_scan(repo_path: str, available: dict) -> ScanResult:
     """Use licensee if available, otherwise grep for LICENSE files."""
-    tr = ToolResult(tool="licensee", available=available.get("licensee", False), ran=False)
+    tr = ScanResult(tool="licensee", available=available.get("licensee", False), ran=False)
     tr.ran = True  # we always do something here
 
     if available.get("licensee", False):
@@ -482,9 +482,9 @@ def run_license_scan(repo_path: str, available: dict) -> ToolResult:
     return tr
 
 
-def run_telemetry_scan(repo_path: str, skip_tests: bool = True) -> ToolResult:
+def run_telemetry_scan(repo_path: str, skip_tests: bool = True) -> ScanResult:
     """Grep-based scan for telemetry/analytics calls and PII patterns."""
-    tr = ToolResult(tool="telemetry-grep", available=True, ran=True)
+    tr = ScanResult(tool="telemetry-grep", available=True, ran=True)
 
     telemetry_patterns = [
         (r"(mixpanel|amplitude|segment\.com|heap\.io|fullstory|hotjar|"

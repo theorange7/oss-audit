@@ -6,7 +6,7 @@ Tests import from the package's public facade (oss_audit.runner / oss_audit.repo
 
 import pytest
 
-from oss_audit.runner import AuditResult, ToolResult, Finding, apply_rubric
+from oss_audit.runner import AuditResult, ScanResult, Finding, apply_rubric
 
 
 def make_finding(category="vuln", severity="high", tool="grype",
@@ -17,7 +17,7 @@ def make_finding(category="vuln", severity="high", tool="grype",
 
 def make_tool_result(tool="grype", findings=None, available=True, ran=True,
                      error="", duration_s=0.5):
-    return ToolResult(tool=tool, available=available, ran=ran,
+    return ScanResult(tool=tool, available=available, ran=ran,
                       findings=list(findings or []), error=error, duration_s=duration_s)
 
 

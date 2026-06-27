@@ -17,7 +17,7 @@ class Finding:
 
 
 @dataclass
-class ToolResult:
+class ScanResult:
     tool: str
     available: bool
     ran: bool
@@ -44,7 +44,7 @@ class AuditResult:
     repo_name: str
     profile: str
     timestamp: str
-    tool_results: list[ToolResult] = field(default_factory=list)
+    tool_results: list[ScanResult] = field(default_factory=list)
     rubric: list[CategoryVerdict] = field(default_factory=list)
     overall_verdict: str = "UNKNOWN"
     overall_reason: str = ""

@@ -1,9 +1,9 @@
 """
-rubric.py — turns a list of ToolResults into per-category verdicts and an
+rubric.py — turns a list of ScanResults into per-category verdicts and an
 overall PASS / WARN / FAIL under the selected profile.
 """
 
-from .models import Finding, ToolResult, CategoryVerdict
+from .models import Finding, ScanResult, CategoryVerdict
 from .severity import SEVERITY_LEVELS
 
 
@@ -31,7 +31,7 @@ RUBRIC_THRESHOLDS = {
 }
 
 
-def apply_rubric(tool_results: list[ToolResult], profile: str) -> tuple[list[CategoryVerdict], str, str]:
+def apply_rubric(tool_results: list[ScanResult], profile: str) -> tuple[list[CategoryVerdict], str, str]:
     thresholds = RUBRIC_THRESHOLDS.get(profile, RUBRIC_THRESHOLDS["standard"])
 
     # Aggregate findings by category

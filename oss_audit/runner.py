@@ -12,7 +12,7 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from datetime import datetime, timezone
 from typing import Optional, Callable
 
-from .models import Finding, ToolResult, CategoryVerdict, AuditResult
+from .models import Finding, ScanResult, CategoryVerdict, AuditResult
 from .severity import (
     SEVERITY_LEVELS, severity_rank, normalise_sev, score_to_severity,
 )
@@ -26,7 +26,7 @@ from .scanners import (
 )
 
 __all__ = [
-    "Finding", "ToolResult", "CategoryVerdict", "AuditResult",
+    "Finding", "ScanResult", "CategoryVerdict", "AuditResult",
     "SEVERITY_LEVELS", "severity_rank", "normalise_sev", "score_to_severity",
     "RUBRIC_THRESHOLDS", "apply_rubric",
     "TOOLS", "TEST_DIR_NAMES", "TEST_FILE_GLOBS", "check_tools", "run_cmd",
