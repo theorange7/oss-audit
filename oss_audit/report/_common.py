@@ -31,3 +31,22 @@ def scanner_findings(result: AuditResult, category: str | None = None) -> list[F
 
 def all_findings(result: AuditResult) -> list[Finding]:
     return scanner_findings(result)
+
+
+def html_escape(s: str) -> str:
+    """Quote-aware HTML escape for untrusted content."""
+    return (s
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+            .replace("'", "&#x27;"))
+
+
+def safe_href(url: str) -> str:
+    """Return url (HTML-escaped) if scheme is http/https, else '#'."""
+    from urllib.parse import urlparse
+    scheme = urlparse(url).scheme.lower()
+    if scheme in ("http", "https"):
+        return html_escape(url)
+    return "#"

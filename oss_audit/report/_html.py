@@ -4,7 +4,7 @@ from datetime import datetime
 
 from ..models import AuditResult
 from ..severity import severity_rank
-from ._common import VERDICT_EMOJI, VERDICT_COLOR, SEV_COLOR, SEV_BG, CAT_LABELS, all_findings
+from ._common import VERDICT_EMOJI, VERDICT_COLOR, SEV_COLOR, SEV_BG, CAT_LABELS, all_findings, html_escape, safe_href
 
 
 def to_html(result: AuditResult) -> str:
@@ -23,13 +23,13 @@ def to_html(result: AuditResult) -> str:
         rc = VERDICT_COLOR.get(r.verdict, "#94a3b8")
         rubric_rows += f"""
         <tr>
-          <td class="cat-label">{CAT_LABELS.get(r.category, r.category)}</td>
+          <td class="cat-label">{html_escape(CAT_LABELS.get(r.category, r.category))}</td>
           <td><span class="verdict-pill" style="background:{rc}20;color:{rc};border:1px solid {rc}40">{r.verdict}</span></td>
           <td class="num {'sev-critical' if r.critical_count else ''}">{r.critical_count}</td>
           <td class="num {'sev-high' if r.high_count else ''}">{r.high_count}</td>
           <td class="num {'sev-medium' if r.medium_count else ''}">{r.medium_count}</td>
           <td class="num">{r.low_count}</td>
-          <td class="reason-text">{r.reason}</td>
+          <td class="reason-text">{html_escape(r.reason)}</td>
         </tr>"""
 
     # Build findings sections
@@ -47,13 +47,12 @@ def to_html(result: AuditResult) -> str:
             sc = SEV_COLOR.get(f.severity, "#64748b")
             sb = SEV_BG.get(f.severity, "#f8fafc")
             loc = f.location or "—"
-            detail_escaped = f.detail.replace("<", "&lt;").replace(">", "&gt;")
             rows += f"""
             <tr>
               <td><span class="sev-badge" style="background:{sb};color:{sc};border:1px solid {sc}40">{f.severity}</span></td>
-              <td class="finding-title">{f.title}</td>
-              <td class="finding-detail">{detail_escaped}</td>
-              <td class="finding-loc"><code>{loc}</code></td>
+              <td class="finding-title">{html_escape(f.title)}</td>
+              <td class="finding-detail">{html_escape(f.detail)}</td>
+              <td class="finding-loc"><code>{html_escape(loc)}</code></td>
             </tr>"""
         overflow = f'<p class="overflow-note">…and {len(cat_findings)-25} more findings. See JSON output for complete list.</p>' if len(cat_findings) > 25 else ""
 
@@ -61,7 +60,43 @@ def to_html(result: AuditResult) -> str:
         <section class="cat-section">
           <h3 class="cat-title" style="border-left:3px solid {rc}">
             <span class="verdict-dot" style="background:{rc}"></span>
-            {CAT_LABELS.get(r.category, r.category)}
+            {html_escape(CAT_LABELS.get(r.category, r.category))}
+          </h3>
+          <div class="table-wrap">
+            <table class="findings-table">
+              <thead><tr><th>Severity</th><th>Finding</th><th>Detail</th><th>Location</th></tr></thead>
+              <tbody>{rows}</tbody>
+            </table>
+          </div>
+          {overflow}
+        </section>"""
+
+    # Findings in categories not present in the rubric → "Other" section
+    rubric_categories = {r.category for r in result.rubric}
+    other_findings = sorted(
+        [f for f in findings if f.category not in rubric_categories],
+        key=lambda f: severity_rank(f.severity)
+    )
+    if other_findings:
+        other_color = "#94a3b8"
+        rows = ""
+        for f in other_findings[:25]:
+            sc = SEV_COLOR.get(f.severity, "#64748b")
+            sb = SEV_BG.get(f.severity, "#f8fafc")
+            loc = f.location or "—"
+            rows += f"""
+            <tr>
+              <td><span class="sev-badge" style="background:{sb};color:{sc};border:1px solid {sc}40">{f.severity}</span></td>
+              <td class="finding-title">{html_escape(f.title)}</td>
+              <td class="finding-detail">{html_escape(f.detail)}</td>
+              <td class="finding-loc"><code>{html_escape(loc)}</code></td>
+            </tr>"""
+        overflow = f'<p class="overflow-note">…and {len(other_findings)-25} more findings. See JSON output for complete list.</p>' if len(other_findings) > 25 else ""
+        finding_sections += f"""
+        <section class="cat-section">
+          <h3 class="cat-title" style="border-left:3px solid {other_color}">
+            <span class="verdict-dot" style="background:{other_color}"></span>
+            Other
           </h3>
           <div class="table-wrap">
             <table class="findings-table">
@@ -78,10 +113,10 @@ def to_html(result: AuditResult) -> str:
         avail_html = '<span class="pill-ok">available</span>' if tr.available else '<span class="pill-skip">skipped</span>'
         ran_html   = '<span class="pill-ok">ran</span>' if tr.ran else '—'
         dur        = f"{tr.duration_s:.1f}s" if tr.ran else "—"
-        err_html   = f'<span class="scanner-error">{tr.error[:80]}</span>' if tr.error else ""
+        err_html   = f'<span class="scanner-error">{html_escape(tr.error[:80])}</span>' if tr.error else ""
         scanner_rows += f"""
         <tr>
-          <td><code class="scanner-name">{tr.scanner}</code></td>
+          <td><code class="scanner-name">{html_escape(tr.scanner)}</code></td>
           <td>{avail_html}</td>
           <td>{ran_html}</td>
           <td class="num">{len(tr.findings)}</td>
@@ -91,7 +126,7 @@ def to_html(result: AuditResult) -> str:
 
     skipped_note = ""
     if result.skipped_scanners:
-        skipped_list = ", ".join(f"<code>{t}</code>" for t in result.skipped_scanners)
+        skipped_list = ", ".join(f"<code>{html_escape(t)}</code>" for t in result.skipped_scanners)
         skipped_note = f'<p class="skipped-note">⬜ Skipped (not installed): {skipped_list}</p>'
 
     # Timestamp formatting
@@ -105,7 +140,7 @@ def to_html(result: AuditResult) -> str:
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OSS Audit — {result.repo_name}</title>
+<title>OSS Audit — {html_escape(result.repo_name)}</title>
 <style>
   :root {{
     --bg: #0f1117;
@@ -367,10 +402,10 @@ def to_html(result: AuditResult) -> str:
 
 <header class="header">
   <div class="header-eyebrow">OSS Security &amp; Privacy Audit</div>
-  <h1 class="header-title">Audit report — <code>{result.repo_name}</code></h1>
+  <h1 class="header-title">Audit report — <code>{html_escape(result.repo_name)}</code></h1>
   <div class="header-meta">
-    <span>🔗 <a href="{result.repo_url}" style="color:#7c86a2;text-decoration:none">{result.repo_url}</a></span>
-    <span>🛡️ Profile: <strong style="color:#cbd5e1">{result.profile}</strong></span>
+    <span>🔗 <a href="{safe_href(result.repo_url)}" style="color:#7c86a2;text-decoration:none">{html_escape(result.repo_url)}</a></span>
+    <span>🛡️ Profile: <strong style="color:#cbd5e1">{html_escape(result.profile)}</strong></span>
     <span>🕒 {ts}</span>
   </div>
 </header>
@@ -379,7 +414,7 @@ def to_html(result: AuditResult) -> str:
   <div class="verdict-icon">{VERDICT_EMOJI.get(v,'?')}</div>
   <div>
     <div class="verdict-label">Overall Verdict</div>
-    <div class="verdict-text">{result.overall_reason}</div>
+    <div class="verdict-text">{html_escape(result.overall_reason)}</div>
   </div>
   <div class="verdict-score-row">
     <div class="stat-chip"><div class="stat-n" style="color:#ef4444">{total_critical}</div><div class="stat-l">Critical</div></div>
@@ -420,7 +455,7 @@ def to_html(result: AuditResult) -> str:
 
 <footer class="footer">
   <span>Generated by <strong>oss-audit</strong></span>
-  <span>Profile: {result.profile} · {ts}</span>
+  <span>Profile: {html_escape(result.profile)} · {ts}</span>
 </footer>
 
 </body>
