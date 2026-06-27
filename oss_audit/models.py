@@ -8,7 +8,7 @@ from typing import Optional
 
 @dataclass
 class Finding:
-    tool: str
+    scanner: str
     severity: str          # critical / high / medium / low / info
     category: str          # vuln / secret / license / health / telemetry / static
     title: str
@@ -17,8 +17,8 @@ class Finding:
 
 
 @dataclass
-class ToolResult:
-    tool: str
+class ScanResult:
+    scanner: str
     available: bool
     ran: bool
     findings: list[Finding] = field(default_factory=list)
@@ -28,7 +28,7 @@ class ToolResult:
 
 
 @dataclass
-class RubricScore:
+class CategoryVerdict:
     category: str
     verdict: str      # PASS / WARN / FAIL
     reason: str
@@ -44,8 +44,8 @@ class AuditResult:
     repo_name: str
     profile: str
     timestamp: str
-    tool_results: list[ToolResult] = field(default_factory=list)
-    rubric: list[RubricScore] = field(default_factory=list)
+    scan_results: list[ScanResult] = field(default_factory=list)
+    rubric: list[CategoryVerdict] = field(default_factory=list)
     overall_verdict: str = "UNKNOWN"
     overall_reason: str = ""
-    skipped_tools: list[str] = field(default_factory=list)
+    skipped_scanners: list[str] = field(default_factory=list)

@@ -1,5 +1,5 @@
 """
-runner.py — orchestrates all scanning tools and returns a unified AuditResult.
+runner.py — orchestrates all scanners and returns a unified AuditResult.
 
 The data model, severity helpers, individual scanners, and rubric engine live in
 their own modules (models / severity / scanners / rubric). They are re-exported
@@ -12,24 +12,24 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from datetime import datetime, timezone
 from typing import Optional, Callable
 
-from .models import Finding, ToolResult, RubricScore, AuditResult
+from .models import Finding, ScanResult, CategoryVerdict, AuditResult
 from .severity import (
     SEVERITY_LEVELS, severity_rank, normalise_sev, score_to_severity,
 )
 from .rubric import RUBRIC_THRESHOLDS, apply_rubric
 from .scanners import (
-    TOOLS, TEST_DIR_NAMES, TEST_FILE_GLOBS,
-    check_tools, run_cmd,
+    SCANNERS, TEST_DIR_NAMES, TEST_FILE_GLOBS,
+    check_scanners, run_cmd,
     run_syft, run_grype, run_trivy, run_gitleaks, run_semgrep,
     run_osv, run_scorecard, run_license_scan, run_telemetry_scan,
     parse_grype, parse_trivy, parse_semgrep, parse_osv, parse_scorecard, parse_gitleaks,
 )
 
 __all__ = [
-    "Finding", "ToolResult", "RubricScore", "AuditResult",
+    "Finding", "ScanResult", "CategoryVerdict", "AuditResult",
     "SEVERITY_LEVELS", "severity_rank", "normalise_sev", "score_to_severity",
     "RUBRIC_THRESHOLDS", "apply_rubric",
-    "TOOLS", "TEST_DIR_NAMES", "TEST_FILE_GLOBS", "check_tools", "run_cmd",
+    "SCANNERS", "TEST_DIR_NAMES", "TEST_FILE_GLOBS", "check_scanners", "run_cmd",
     "run_syft", "run_grype", "run_trivy", "run_gitleaks", "run_semgrep",
     "run_osv", "run_scorecard", "run_license_scan", "run_telemetry_scan",
     "parse_grype", "parse_trivy", "parse_semgrep", "parse_osv", "parse_scorecard", "parse_gitleaks",
@@ -48,12 +48,12 @@ def audit(
     """
     Run a full audit of repo_url under the given profile.
 
-    on_event(tool, status) is called as each tool transitions state:
+    on_event(scanner, status) is called as each scanner transitions state:
       status is one of: "started", "done", "skipped", "error"
     """
-    def notify(tool: str, status: str):
+    def notify(scanner: str, status: str):
         if on_event:
-            on_event(tool, status)
+            on_event(scanner, status)
 
     repo_name = repo_url.rstrip("/").split("/")[-1].replace(".git", "")
     result = AuditResult(
@@ -63,7 +63,7 @@ def audit(
         timestamp=datetime.now(timezone.utc).isoformat(),
     )
 
-    available = check_tools()
+    available = check_scanners()
 
     with tempfile.TemporaryDirectory(prefix="oss-audit-") as tmpdir:
         repo_path = os.path.join(tmpdir, repo_name)
@@ -75,7 +75,7 @@ def audit(
                 notify("scorecard", "started")
                 sc_future = pool.submit(run_scorecard, repo_url, available)
             else:
-                result.skipped_tools.append("scorecard")
+                result.skipped_scanners.append("scorecard")
                 notify("scorecard", "skipped")
 
             # Clone the repo.
@@ -103,7 +103,7 @@ def audit(
                 notify(name, "done")
                 return tr, sbom
 
-            # Submit all clone-independent tools in parallel.
+            # Submit all clone-independent scanners in parallel.
             syft_future   = pool.submit(_run_syft, "syft")
             trivy_fut     = pool.submit(_run, "trivy",      run_trivy,          repo_path, available, skip_tests)
             gitleaks_fut  = pool.submit(_run, "gitleaks",   run_gitleaks,       repo_path, available)
@@ -115,7 +115,7 @@ def audit(
             # Grype can start as soon as syft finishes (uses the SBOM).
             syft_tr, sbom_path = syft_future.result()
             if not syft_tr.available:
-                result.skipped_tools.append("syft")
+                result.skipped_scanners.append("syft")
                 notify("syft", "skipped")
 
             notify("grype", "started")
@@ -144,14 +144,14 @@ def audit(
         (lic_tr,     None),
         (tel_tr,     None),
     ]:
-        result.tool_results.append(tr)
+        result.scan_results.append(tr)
         if skip_name and not tr.available:
-            result.skipped_tools.append(skip_name)
+            result.skipped_scanners.append(skip_name)
 
     if sc_tr:
-        result.tool_results.append(sc_tr)
+        result.scan_results.append(sc_tr)
 
-    rubric, overall, reason = apply_rubric(result.tool_results, profile)
+    rubric, overall, reason = apply_rubric(result.scan_results, profile)
     result.rubric = rubric
     result.overall_verdict = overall
     result.overall_reason = reason

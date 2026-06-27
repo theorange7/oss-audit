@@ -14,7 +14,7 @@ import socket
 
 import pytest
 
-from oss_audit.runner import audit, check_tools
+from oss_audit.runner import audit, check_scanners
 from oss_audit.report import to_json, to_markdown, to_html
 
 # Tiny, stable, dependency-free repository — fast to clone.
@@ -32,7 +32,7 @@ def _network_available(host: str = "github.com", port: int = 443, timeout: float
 
 @pytest.mark.e2e
 def test_e2e_real_audit_is_well_formed():
-    if not check_tools().get("git"):
+    if not check_scanners().get("git"):
         pytest.skip("git is not installed")
     if not _network_available():
         pytest.skip("no network access to github.com")
@@ -47,19 +47,19 @@ def test_e2e_real_audit_is_well_formed():
     # ── structural assertions on a genuine run ──
     assert result.repo_name == E2E_REPO_NAME
     assert result.overall_verdict in {"PASS", "WARN", "FAIL"}
-    assert result.tool_results, "expected at least one tool result"
-    assert result.rubric, "expected rubric scores"
+    assert result.scan_results, "expected at least one scan result"
+    assert result.rubric, "expected rubric verdicts"
     assert result.timestamp
 
     # The telemetry grep needs no external binary, so it always runs.
-    ran_tools = {tr.tool for tr in result.tool_results if tr.ran}
-    assert "telemetry-grep" in ran_tools
+    ran_scanners = {tr.scanner for tr in result.scan_results if tr.ran}
+    assert "telemetry-grep" in ran_scanners
 
     # Any scanner reported as available must have actually run.
-    available = check_tools()
-    for tr in result.tool_results:
+    available = check_scanners()
+    for tr in result.scan_results:
         if tr.available:
-            assert tr.ran, f"{tr.tool} was available but did not run"
+            assert tr.ran, f"{tr.scanner} was available but did not run"
 
     # The real result must render in all three formats without error.
     data = json.loads(to_json(result))

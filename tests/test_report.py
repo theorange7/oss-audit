@@ -10,15 +10,15 @@ def test_to_json_structure(build_result):
     res = build_result(findings=[
         make_finding(category="vuln", severity="critical", title="CVE-1"),
         make_finding(category="vuln", severity="low", title="CVE-2"),
-    ], skipped_tools=["scorecard"])
+    ], skipped_scanners=["scorecard"])
     data = json.loads(to_json(res))
 
     assert data["meta"]["repo_name"] == "myrepo"
     assert data["meta"]["overall_verdict"] == res.overall_verdict
-    assert data["skipped_tools"] == ["scorecard"]
+    assert data["skipped_scanners"] == ["scorecard"]
     assert len(data["findings"]) == 2
     assert {f["title"] for f in data["findings"]} == {"CVE-1", "CVE-2"}
-    assert any(t["tool"] == "grype" for t in data["tool_summary"])
+    assert any(t["scanner"] == "grype" for t in data["scanner_summary"])
 
 
 def test_to_markdown_contains_key_fields(build_result):

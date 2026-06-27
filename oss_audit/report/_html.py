@@ -4,7 +4,10 @@ from datetime import datetime
 
 from ..models import AuditResult
 from ..severity import severity_rank
-from ._common import VERDICT_EMOJI, VERDICT_COLOR, SEV_COLOR, SEV_BG, CAT_LABELS, all_findings
+from ._common import (
+    VERDICT_EMOJI, VERDICT_COLOR, SEV_COLOR, SEV_BG, CAT_LABELS, all_findings,
+    scanned_by, display_scanner,
+)
 
 
 def to_html(result: AuditResult) -> str:
@@ -39,9 +42,35 @@ def to_html(result: AuditResult) -> str:
             [f for f in findings if f.category == r.category],
             key=lambda f: severity_rank(f.severity)
         )
-        if not cat_findings:
-            continue
         rc = VERDICT_COLOR.get(r.verdict, "#94a3b8")
+
+        # Scanner attribution line — names who scanned this category, even when clean.
+        ran, not_installed = scanned_by(result, r.category)
+        scanned_disp = ", ".join(display_scanner(s) for s in ran) if ran else "—"
+        n = len(cat_findings)
+        scanned_html = (
+            f'<div class="scanned-by">Scanned by: <strong>{scanned_disp}</strong>'
+            f' · {n} finding{"s" if n != 1 else ""}'
+        )
+        if not_installed:
+            ni = ", ".join(f"<code>{t}</code>" for t in not_installed)
+            scanned_html += f' <span class="not-installed">· not installed: {ni}</span>'
+        scanned_html += "</div>"
+
+        # Clean section: render a compact card so "we scanned and found nothing"
+        # is visible here, not only in the summary table above.
+        if not cat_findings:
+            finding_sections += f"""
+        <section class="cat-section">
+          <h3 class="cat-title" style="border-left:3px solid {rc}">
+            <span class="verdict-dot" style="background:{rc}"></span>
+            {CAT_LABELS.get(r.category, r.category)}
+          </h3>
+          {scanned_html}
+          <p class="clean-note">✅ No issues detected. {r.reason}</p>
+        </section>"""
+            continue
+
         rows = ""
         for f in cat_findings[:25]:
             sc = SEV_COLOR.get(f.severity, "#64748b")
@@ -53,6 +82,7 @@ def to_html(result: AuditResult) -> str:
               <td><span class="sev-badge" style="background:{sb};color:{sc};border:1px solid {sc}40">{f.severity}</span></td>
               <td class="finding-title">{f.title}</td>
               <td class="finding-detail">{detail_escaped}</td>
+              <td><code class="scanner-name">{f.scanner}</code></td>
               <td class="finding-loc"><code>{loc}</code></td>
             </tr>"""
         overflow = f'<p class="overflow-note">…and {len(cat_findings)-25} more findings. See JSON output for complete list.</p>' if len(cat_findings) > 25 else ""
@@ -63,25 +93,26 @@ def to_html(result: AuditResult) -> str:
             <span class="verdict-dot" style="background:{rc}"></span>
             {CAT_LABELS.get(r.category, r.category)}
           </h3>
+          {scanned_html}
           <div class="table-wrap">
             <table class="findings-table">
-              <thead><tr><th>Severity</th><th>Finding</th><th>Detail</th><th>Location</th></tr></thead>
+              <thead><tr><th>Severity</th><th>Finding</th><th>Detail</th><th>Scanner</th><th>Location</th></tr></thead>
               <tbody>{rows}</tbody>
             </table>
           </div>
           {overflow}
         </section>"""
 
-    # Tool coverage rows
-    tool_rows = ""
-    for tr in result.tool_results:
+    # Scanner coverage rows
+    scanner_rows = ""
+    for tr in result.scan_results:
         avail_html = '<span class="pill-ok">available</span>' if tr.available else '<span class="pill-skip">skipped</span>'
         ran_html   = '<span class="pill-ok">ran</span>' if tr.ran else '—'
         dur        = f"{tr.duration_s:.1f}s" if tr.ran else "—"
-        err_html   = f'<span class="tool-error">{tr.error[:80]}</span>' if tr.error else ""
-        tool_rows += f"""
+        err_html   = f'<span class="scanner-error">{tr.error[:80]}</span>' if tr.error else ""
+        scanner_rows += f"""
         <tr>
-          <td><code class="tool-name">{tr.tool}</code></td>
+          <td><code class="scanner-name">{tr.scanner}</code></td>
           <td>{avail_html}</td>
           <td>{ran_html}</td>
           <td class="num">{len(tr.findings)}</td>
@@ -90,8 +121,8 @@ def to_html(result: AuditResult) -> str:
         </tr>"""
 
     skipped_note = ""
-    if result.skipped_tools:
-        skipped_list = ", ".join(f"<code>{t}</code>" for t in result.skipped_tools)
+    if result.skipped_scanners:
+        skipped_list = ", ".join(f"<code>{t}</code>" for t in result.skipped_scanners)
         skipped_note = f'<p class="skipped-note">⬜ Skipped (not installed): {skipped_list}</p>'
 
     # Timestamp formatting
@@ -329,10 +360,27 @@ def to_html(result: AuditResult) -> str:
   .finding-detail {{ color: var(--text-muted); font-size: 12px; max-width: 320px; }}
   .finding-loc code {{ font-family: var(--mono); font-size: 11px; color: #7c86a2; word-break: break-all; }}
   .overflow-note {{ font-size: 12px; color: var(--text-muted); padding: 0.5rem 0.75rem; font-style: italic; }}
+  .scanned-by {{
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 0.4rem 0.75rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border)30;
+  }}
+  .scanned-by strong {{ color: #a5b4fc; font-weight: 600; }}
+  .scanned-by .not-installed {{ color: var(--text-muted); }}
+  .scanned-by code {{ font-family: var(--mono); font-size: 11px; color: #7c86a2; }}
+  .clean-note {{
+    font-size: 12px;
+    color: #4ade80;
+    padding: 0.6rem 0.75rem;
+    background: var(--surface);
+    border-radius: 0 0 6px 6px;
+  }}
 
-  /* ── tool coverage ── */
-  .tool-name {{ color: #a5b4fc; }}
-  .tool-error {{ color: #f87171; font-size: 11px; }}
+  /* ── scanner coverage ── */
+  .scanner-name {{ color: #a5b4fc; }}
+  .scanner-error {{ color: #f87171; font-size: 11px; }}
 
   /* ── misc ── */
   .skipped-note {{
@@ -407,12 +455,12 @@ def to_html(result: AuditResult) -> str:
   <div class="section-title">Findings by Category</div>
   {finding_sections}
 
-  <div class="section-title">Tool Coverage</div>
+  <div class="section-title">Scanner Coverage</div>
   <table class="summary-table">
     <thead>
-      <tr><th>Tool</th><th>Available</th><th>Ran</th><th>Findings</th><th>Duration</th><th>Error</th></tr>
+      <tr><th>Scanner</th><th>Available</th><th>Ran</th><th>Findings</th><th>Duration</th><th>Error</th></tr>
     </thead>
-    <tbody>{tool_rows}</tbody>
+    <tbody>{scanner_rows}</tbody>
   </table>
   {skipped_note}
 
