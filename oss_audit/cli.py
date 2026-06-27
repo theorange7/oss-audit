@@ -224,7 +224,7 @@ def scan(repo_url, profile, output, fmt, include_tests):
         )
 
         _scanner_key = {"telemetry-grep": "telemetry"}
-        for tr in result.tool_results:
+        for tr in result.scan_results:
             tracker.set_findings(_scanner_key.get(tr.scanner, tr.scanner), len(tr.findings))
 
         done_event.set()
@@ -453,8 +453,8 @@ def _print_summary(result, wall_s: float = 0.0):
 
     console.print(t)
 
-    if result.skipped_tools:
-        console.print(f"  [dim]Skipped (not installed): {', '.join(result.skipped_tools)}[/]")
+    if result.skipped_scanners:
+        console.print(f"  [dim]Skipped (not installed): {', '.join(result.skipped_scanners)}[/]")
         console.print()
 
     if wall_s:

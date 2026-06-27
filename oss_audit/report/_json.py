@@ -25,14 +25,14 @@ def to_json(result: AuditResult) -> str:
             "overall_verdict": result.overall_verdict,
             "overall_reason": result.overall_reason,
         },
-        "skipped_tools": result.skipped_tools,
+        "skipped_tools": result.skipped_scanners,
         "rubric": [rubric_dict(r) for r in result.rubric],
         "findings": [finding_dict(f) for f in all_findings(result)],
         "tool_summary": [
             {"tool": tr.scanner, "available": tr.available, "ran": tr.ran,
              "duration_s": round(tr.duration_s, 2), "finding_count": len(tr.findings),
              "error": tr.error}
-            for tr in result.tool_results
+            for tr in result.scan_results
         ],
     }
     return json.dumps(data, indent=2)

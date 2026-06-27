@@ -22,7 +22,7 @@ CAT_LABELS = {
 
 def tool_findings(result: AuditResult, category: str | None = None) -> list[Finding]:
     findings = []
-    for tr in result.tool_results:
+    for tr in result.scan_results:
         for f in tr.findings:
             if category is None or f.category == category:
                 findings.append(f)

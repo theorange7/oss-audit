@@ -74,7 +74,7 @@ def to_html(result: AuditResult) -> str:
 
     # Tool coverage rows
     tool_rows = ""
-    for tr in result.tool_results:
+    for tr in result.scan_results:
         avail_html = '<span class="pill-ok">available</span>' if tr.available else '<span class="pill-skip">skipped</span>'
         ran_html   = '<span class="pill-ok">ran</span>' if tr.ran else '—'
         dur        = f"{tr.duration_s:.1f}s" if tr.ran else "—"
@@ -90,8 +90,8 @@ def to_html(result: AuditResult) -> str:
         </tr>"""
 
     skipped_note = ""
-    if result.skipped_tools:
-        skipped_list = ", ".join(f"<code>{t}</code>" for t in result.skipped_tools)
+    if result.skipped_scanners:
+        skipped_list = ", ".join(f"<code>{t}</code>" for t in result.skipped_scanners)
         skipped_note = f'<p class="skipped-note">⬜ Skipped (not installed): {skipped_list}</p>'
 
     # Timestamp formatting

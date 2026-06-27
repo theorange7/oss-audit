@@ -60,15 +60,15 @@ def to_markdown(result: AuditResult) -> str:
     lines += ["---", "", "## Tool Coverage", "",
               "| Tool | Available | Ran | Findings | Duration |",
               "|---|---|---|---|---|"]
-    for tr in result.tool_results:
+    for tr in result.scan_results:
         avail = "✅" if tr.available else "⬜ skipped"
         ran   = "✅" if tr.ran else "—"
         dur   = f"{tr.duration_s:.1f}s" if tr.ran else "—"
         lines.append(f"| {tr.scanner} | {avail} | {ran} | {len(tr.findings)} | {dur} |")
 
-    if result.skipped_tools:
+    if result.skipped_scanners:
         lines += ["",
-                  f"> **Skipped tools** (not installed): {', '.join(f'`{t}`' for t in result.skipped_tools)}",
+                  f"> **Skipped tools** (not installed): {', '.join(f'`{t}`' for t in result.skipped_scanners)}",
                   "> Install them to improve coverage."]
 
     lines += ["", "---", "",

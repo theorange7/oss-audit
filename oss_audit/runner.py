@@ -75,7 +75,7 @@ def audit(
                 notify("scorecard", "started")
                 sc_future = pool.submit(run_scorecard, repo_url, available)
             else:
-                result.skipped_tools.append("scorecard")
+                result.skipped_scanners.append("scorecard")
                 notify("scorecard", "skipped")
 
             # Clone the repo.
@@ -115,7 +115,7 @@ def audit(
             # Grype can start as soon as syft finishes (uses the SBOM).
             syft_tr, sbom_path = syft_future.result()
             if not syft_tr.available:
-                result.skipped_tools.append("syft")
+                result.skipped_scanners.append("syft")
                 notify("syft", "skipped")
 
             notify("grype", "started")
@@ -144,14 +144,14 @@ def audit(
         (lic_tr,     None),
         (tel_tr,     None),
     ]:
-        result.tool_results.append(tr)
+        result.scan_results.append(tr)
         if skip_name and not tr.available:
-            result.skipped_tools.append(skip_name)
+            result.skipped_scanners.append(skip_name)
 
     if sc_tr:
-        result.tool_results.append(sc_tr)
+        result.scan_results.append(sc_tr)
 
-    rubric, overall, reason = apply_rubric(result.tool_results, profile)
+    rubric, overall, reason = apply_rubric(result.scan_results, profile)
     result.rubric = rubric
     result.overall_verdict = overall
     result.overall_reason = reason

@@ -31,12 +31,12 @@ RUBRIC_THRESHOLDS = {
 }
 
 
-def apply_rubric(tool_results: list[ScanResult], profile: str) -> tuple[list[CategoryVerdict], str, str]:
+def apply_rubric(scan_results: list[ScanResult], profile: str) -> tuple[list[CategoryVerdict], str, str]:
     thresholds = RUBRIC_THRESHOLDS.get(profile, RUBRIC_THRESHOLDS["standard"])
 
     # Aggregate findings by category
     by_category: dict[str, list[Finding]] = {}
-    for tr in tool_results:
+    for tr in scan_results:
         for f in tr.findings:
             by_category.setdefault(f.category, []).append(f)
 

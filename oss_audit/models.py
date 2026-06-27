@@ -44,8 +44,8 @@ class AuditResult:
     repo_name: str
     profile: str
     timestamp: str
-    tool_results: list[ScanResult] = field(default_factory=list)
+    scan_results: list[ScanResult] = field(default_factory=list)
     rubric: list[CategoryVerdict] = field(default_factory=list)
     overall_verdict: str = "UNKNOWN"
     overall_reason: str = ""
-    skipped_tools: list[str] = field(default_factory=list)
+    skipped_scanners: list[str] = field(default_factory=list)

@@ -10,7 +10,7 @@ def test_to_json_structure(build_result):
     res = build_result(findings=[
         make_finding(category="vuln", severity="critical", title="CVE-1"),
         make_finding(category="vuln", severity="low", title="CVE-2"),
-    ], skipped_tools=["scorecard"])
+    ], skipped_scanners=["scorecard"])
     data = json.loads(to_json(res))
 
     assert data["meta"]["repo_name"] == "myrepo"
