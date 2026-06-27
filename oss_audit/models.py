@@ -28,7 +28,7 @@ class ToolResult:
 
 
 @dataclass
-class RubricScore:
+class CategoryVerdict:
     category: str
     verdict: str      # PASS / WARN / FAIL
     reason: str
@@ -45,7 +45,7 @@ class AuditResult:
     profile: str
     timestamp: str
     tool_results: list[ToolResult] = field(default_factory=list)
-    rubric: list[RubricScore] = field(default_factory=list)
+    rubric: list[CategoryVerdict] = field(default_factory=list)
     overall_verdict: str = "UNKNOWN"
     overall_reason: str = ""
     skipped_tools: list[str] = field(default_factory=list)

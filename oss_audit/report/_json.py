@@ -2,7 +2,7 @@
 
 import json
 
-from ..models import AuditResult, Finding, RubricScore
+from ..models import AuditResult, Finding, CategoryVerdict
 from ._common import all_findings
 
 
@@ -11,7 +11,7 @@ def to_json(result: AuditResult) -> str:
         return {"tool": f.tool, "severity": f.severity, "category": f.category,
                 "title": f.title, "detail": f.detail, "location": f.location}
 
-    def rubric_dict(r: RubricScore):
+    def rubric_dict(r: CategoryVerdict):
         return {"category": r.category, "verdict": r.verdict, "reason": r.reason,
                 "counts": {"critical": r.critical_count, "high": r.high_count,
                            "medium": r.medium_count, "low": r.low_count}}

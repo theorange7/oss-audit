@@ -3,7 +3,7 @@ rubric.py — turns a list of ToolResults into per-category verdicts and an
 overall PASS / WARN / FAIL under the selected profile.
 """
 
-from .models import Finding, ToolResult, RubricScore
+from .models import Finding, ToolResult, CategoryVerdict
 from .severity import SEVERITY_LEVELS
 
 
@@ -31,7 +31,7 @@ RUBRIC_THRESHOLDS = {
 }
 
 
-def apply_rubric(tool_results: list[ToolResult], profile: str) -> tuple[list[RubricScore], str, str]:
+def apply_rubric(tool_results: list[ToolResult], profile: str) -> tuple[list[CategoryVerdict], str, str]:
     thresholds = RUBRIC_THRESHOLDS.get(profile, RUBRIC_THRESHOLDS["standard"])
 
     # Aggregate findings by category
@@ -71,7 +71,7 @@ def apply_rubric(tool_results: list[ToolResult], profile: str) -> tuple[list[Rub
                 else:
                     reason = f"{counts['high']} high / {counts['medium']} medium issue(s) — review recommended."
 
-        scores.append(RubricScore(
+        scores.append(CategoryVerdict(
             category=cat,
             verdict=verdict,
             reason=reason,
