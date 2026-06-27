@@ -244,7 +244,7 @@ ossa scan <url>
 
 ## Extending
 
-**Add a new scanner:** implement a `run_<tool>(repo_path, available) -> ToolResult` function in `oss_audit/scanners.py` (split the output parsing into a pure `parse_<tool>(data) -> list[Finding]` so it can be unit-tested), submit it in `audit()` in `runner.py`, and append its `ToolResult` to `result.tool_results`. Ensure its findings use the standard `category` values (`vuln`, `secret`, `license`, `health`, `telemetry`, `static`) and a severity from `SEVERITY_LEVELS` (`oss_audit/severity.py`).
+**Add a new scanner:** implement a `run_<scanner>(repo_path, available) -> ScanResult` function in `oss_audit/scanners.py` (split the output parsing into a pure `parse_<scanner>(data) -> list[Finding]` so it can be unit-tested), submit it in `audit()` in `runner.py`, and append its `ScanResult` to `result.scan_results`. Ensure its findings use the standard `category` values (`vuln`, `secret`, `license`, `health`, `telemetry`, `static`) and a severity from `SEVERITY_LEVELS` (`oss_audit/severity.py`).
 
 **Customise the rubric:** edit the `RUBRIC_THRESHOLDS` dict in `oss_audit/rubric.py`, or add a new profile key.
 
