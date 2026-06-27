@@ -169,10 +169,13 @@ If none is found, the Scorecard check is reported as skipped with an explanation
 |---|---|---|
 | Fail on critical CVE | 1+ | 1+ |
 | Fail on high CVEs | 5+ | **1+** |
-| Fail on telemetry high findings | 3+ | **1+** |
-| Fail on static high findings | 10+ | **5+** |
+| Fail on high static findings | 10+ | **5+** |
+| Fail on high health findings | 3+ | **2+** |
+| Telemetry findings | Warn only — never fails | Warn only — never fails |
 
-Use `--profile privacy` (the default) for anything involving personal data, confidential information, or mixed tech-literacy environments where telemetry risks need to be surfaced aggressively.
+**Telemetry is advisory.** It can raise a `WARN` but never a `FAIL`, in either profile, because the telemetry scanner is a heuristic grep prone to false positives. The `privacy` profile tightens vulnerability, static-analysis, and health thresholds but leaves telemetry warn-only — see [ADR-0001](docs/adr/0001-telemetry-is-advisory.md). A CI gate keyed on the FAIL exit code will not block on telemetry alone.
+
+Use `--profile privacy` (the default) for anything involving personal data, confidential information, or mixed tech-literacy environments where risks need to be surfaced aggressively.
 
 ---
 
