@@ -50,14 +50,22 @@ gem install licensee
 Check what's installed:
 
 ```bash
-ossa scan --check-tools
+ossa check
 ```
 
 ---
 
 ## Usage
 
-`oss-audit` is a command group with two subcommands: `scan` and `reports`.
+`oss-audit` is a command group with three subcommands: `check`, `scan`, and `reports`.
+
+### `check` — list available scanners
+
+```
+ossa check
+```
+
+Prints which external scanners are installed and which are missing (missing ones are skipped during audits), then exits.
 
 ### `scan` — audit a repository
 
@@ -76,7 +84,6 @@ Options:
   -f, --format [all|md|html|json]   Output format(s) (default: html)
   --include-tests                   Scan test files too (excluded by default
                                     to reduce false positives)
-  --check-tools                     Print tool availability and exit
   -h, --help                        Show this message and exit
 ```
 
