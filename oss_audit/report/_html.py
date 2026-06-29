@@ -4,8 +4,10 @@ from datetime import datetime
 
 from ..models import AuditResult
 from ..severity import severity_rank
-from ._common import VERDICT_EMOJI, VERDICT_COLOR, SEV_COLOR, SEV_BG, CAT_LABELS, all_findings, html_escape, safe_href
-
+from ._common import (
+    VERDICT_EMOJI, VERDICT_COLOR, SEV_COLOR, SEV_BG, CAT_LABELS, all_findings,
+    scanned_by, display_scanner,
+)
 
 def to_html(result: AuditResult) -> str:
     v = result.overall_verdict
@@ -39,9 +41,35 @@ def to_html(result: AuditResult) -> str:
             [f for f in findings if f.category == r.category],
             key=lambda f: severity_rank(f.severity)
         )
-        if not cat_findings:
-            continue
         rc = VERDICT_COLOR.get(r.verdict, "#94a3b8")
+
+        # Scanner attribution line — names who scanned this category, even when clean.
+        ran, not_installed = scanned_by(result, r.category)
+        scanned_disp = ", ".join(display_scanner(s) for s in ran) if ran else "—"
+        n = len(cat_findings)
+        scanned_html = (
+            f'<div class="scanned-by">Scanned by: <strong>{scanned_disp}</strong>'
+            f' · {n} finding{"s" if n != 1 else ""}'
+        )
+        if not_installed:
+            ni = ", ".join(f"<code>{t}</code>" for t in not_installed)
+            scanned_html += f' <span class="not-installed">· not installed: {ni}</span>'
+        scanned_html += "</div>"
+
+        # Clean section: render a compact card so "we scanned and found nothing"
+        # is visible here, not only in the summary table above.
+        if not cat_findings:
+            finding_sections += f"""
+        <section class="cat-section">
+          <h3 class="cat-title" style="border-left:3px solid {rc}">
+            <span class="verdict-dot" style="background:{rc}"></span>
+            {CAT_LABELS.get(r.category, r.category)}
+          </h3>
+          {scanned_html}
+          <p class="clean-note">✅ No issues detected. {r.reason}</p>
+        </section>"""
+            continue
+
         rows = ""
         for f in cat_findings[:25]:
             sc = SEV_COLOR.get(f.severity, "#64748b")
@@ -98,9 +126,10 @@ def to_html(result: AuditResult) -> str:
             <span class="verdict-dot" style="background:{other_color}"></span>
             Other
           </h3>
+          {scanned_html}
           <div class="table-wrap">
             <table class="findings-table">
-              <thead><tr><th>Severity</th><th>Finding</th><th>Detail</th><th>Location</th></tr></thead>
+              <thead><tr><th>Severity</th><th>Finding</th><th>Detail</th><th>Scanner</th><th>Location</th></tr></thead>
               <tbody>{rows}</tbody>
             </table>
           </div>
@@ -364,6 +393,23 @@ def to_html(result: AuditResult) -> str:
   .finding-detail {{ color: var(--text-muted); font-size: 12px; max-width: 320px; }}
   .finding-loc code {{ font-family: var(--mono); font-size: 11px; color: #7c86a2; word-break: break-all; }}
   .overflow-note {{ font-size: 12px; color: var(--text-muted); padding: 0.5rem 0.75rem; font-style: italic; }}
+  .scanned-by {{
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 0.4rem 0.75rem;
+    background: var(--surface);
+    border-top: 1px solid var(--border)30;
+  }}
+  .scanned-by strong {{ color: #a5b4fc; font-weight: 600; }}
+  .scanned-by .not-installed {{ color: var(--text-muted); }}
+  .scanned-by code {{ font-family: var(--mono); font-size: 11px; color: #7c86a2; }}
+  .clean-note {{
+    font-size: 12px;
+    color: #4ade80;
+    padding: 0.6rem 0.75rem;
+    background: var(--surface);
+    border-radius: 0 0 6px 6px;
+  }}
 
   /* ── scanner coverage ── */
   .scanner-name {{ color: #a5b4fc; }}

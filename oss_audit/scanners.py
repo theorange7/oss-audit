@@ -442,7 +442,12 @@ def run_license_scan(repo_path: str, available: dict) -> ScanResult:
         except Exception:
             tr.error = "Could not parse licensee JSON"
     else:
-        # Fallback: scan LICENSE files manually
+        # Fallback: scan LICENSE files manually with a regex heuristic. This is NOT
+        # licensee, so attribute it honestly to "license-grep" — both the ScanResult
+        # and every finding — otherwise the report would claim licensee ran when it
+        # was not installed.
+        tr.scanner = "license-grep"
+        tr.available = True  # the grep heuristic itself is always available
         for fname in ["LICENSE", "LICENSE.txt", "LICENSE.md", "COPYING"]:
             fpath = os.path.join(repo_path, fname)
             if os.path.exists(fpath):
@@ -464,7 +469,7 @@ def run_license_scan(repo_path: str, available: dict) -> ScanResult:
                 else:
                     sev, label = "medium", "License detected but type unclear — review manually"
                 tr.findings.append(Finding(
-                    scanner="licensee",
+                    scanner="license-grep",
                     severity=sev,
                     category="license",
                     title=f"License: {label}",
@@ -473,7 +478,7 @@ def run_license_scan(repo_path: str, available: dict) -> ScanResult:
                 break
         else:
             tr.findings.append(Finding(
-                scanner="licensee",
+                scanner="license-grep",
                 severity="medium",
                 category="license",
                 title="No LICENSE file found",
