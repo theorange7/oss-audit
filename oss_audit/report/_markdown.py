@@ -7,6 +7,15 @@ from ._common import (
 )
 
 
+def md_escape(s: str) -> str:
+    """Escape Markdown table-significant characters in untrusted cell content."""
+    s = s.replace("\\", "\\\\")
+    s = s.replace("|", "\\|")
+    s = s.replace("`", "'")
+    s = s.replace("\n", " ").replace("\r", "")
+    return s
+
+
 def to_markdown(result: AuditResult) -> str:
     v = result.overall_verdict
     emoji = VERDICT_EMOJI.get(v, "❓")
@@ -31,7 +40,7 @@ def to_markdown(result: AuditResult) -> str:
     for r in result.rubric:
         e = VERDICT_EMOJI.get(r.verdict, "?")
         lines.append(
-            f"| {CAT_LABELS.get(r.category, r.category)} "
+            f"| {md_escape(CAT_LABELS.get(r.category, r.category))} "
             f"| {e} {r.verdict} "
             f"| {r.critical_count} | {r.high_count} | {r.medium_count} | {r.low_count} |"
         )
@@ -48,10 +57,10 @@ def to_markdown(result: AuditResult) -> str:
         scanned_line = f"**Scanned by:** {scanned_str} · {n} finding{'s' if n != 1 else ''}  "
 
         lines += [
-            f"### {e} {CAT_LABELS.get(r.category, r.category)}",
+            f"### {e} {md_escape(CAT_LABELS.get(r.category, r.category))}",
             f"**Verdict:** {r.verdict}  ",
-            f"**Reason:** {r.reason}  ",
-            scanned_line,
+            f"**Reason:** {md_escape(r.reason)}",
+            "",
         ]
         if not_installed:
             lines.append(f"**Not installed:** {', '.join(f'`{t}`' for t in not_installed)}  ")
@@ -63,11 +72,25 @@ def to_markdown(result: AuditResult) -> str:
             lines += ["| Severity | Title | Scanner | Location |",
                       "|---|---|---|---|"]
             for f in cat_findings[:10]:
-                loc = f.location or "—"
-                lines.append(f"| `{f.severity}` | {f.title} | `{f.scanner}` | `{loc}` |")
+                loc = md_escape(f.location or "—")
+                lines.append(f"| `{f.severity}` | {md_escape(f.title)} | `{loc}` |")
             if len(cat_findings) > 10:
                 lines.append(f"_…and {len(cat_findings)-10} more. See JSON output for full list._")
             lines.append("")
+
+    # Findings in categories not present in the rubric → "Other" section
+    rubric_categories = {r.category for r in result.rubric}
+    other_findings = [f for f in all_findings(result) if f.category not in rubric_categories]
+    if other_findings:
+        other_findings.sort(key=lambda f: severity_rank(f.severity))
+        lines += ["### ❓ Other", "**Verdict:** UNKNOWN  ", ""]
+        lines += ["| Severity | Title | Location |", "|---|---|---|"]
+        for f in other_findings[:10]:
+            loc = md_escape(f.location or "—")
+            lines.append(f"| `{f.severity}` | {md_escape(f.title)} | `{loc}` |")
+        if len(other_findings) > 10:
+            lines.append(f"_…and {len(other_findings)-10} more. See JSON output for full list._")
+        lines.append("")
 
     # Scanner coverage
     lines += ["---", "", "## Scanner Coverage", "",
@@ -77,7 +100,7 @@ def to_markdown(result: AuditResult) -> str:
         avail = "✅" if tr.available else "⬜ skipped"
         ran   = "✅" if tr.ran else "—"
         dur   = f"{tr.duration_s:.1f}s" if tr.ran else "—"
-        lines.append(f"| {tr.scanner} | {avail} | {ran} | {len(tr.findings)} | {dur} |")
+        lines.append(f"| {md_escape(tr.scanner)} | {avail} | {ran} | {len(tr.findings)} | {dur} |")
 
     if result.skipped_scanners:
         lines += ["",
